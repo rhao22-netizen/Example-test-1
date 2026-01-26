@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Aim Trainer: Falling Targets</title>
+  <style>
+    :root { color-scheme: dark; }
+    body{
+      margin:0;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, "Noto Sans", "PingFang SC", "Microsoft YaHei", sans-serif;
+      background:#0b0f14;
+      color:#e8eef6;
+      display:flex;
+      justify-content:center;
+      min-height:100vh;
+    }
+    .wrap{ width:min(980px, 96vw); padding:18px 10px 26px; }
+    .top{
+      display:flex; gap:12px; align-items:flex-end; justify-content:space-between; flex-wrap:wrap;
+      margin-bottom:10px;
+    }
+    .title{ font-size:20px; font-weight:800; letter-spacing:0.2px; }
+    .sub{ font-size:13px; color:#a9b4c2; line-height:1.35; margin-top:4px; }
+    .panel{
+      display:flex; gap:10px; align-items:center; flex-wrap:wrap;
+      background:#0f1722;
+      border:1px solid rgba(255,255,255,0.08);
+      border-radius:14px;
+      padding:10px;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.35);
+    }
+    .stat{
+      padding:6px 10px;
+      border-radius:12px;
+      background:rgba(255,255,255,0.04);
+      border:1px solid rgba(255,255,255,0.08);
+      font-size:13px;
+      white-space:nowrap;
+    }
+    .stat b{ font-size:14px; }
+    .btn{
+      background:#1b2a3d;
+      color:#e8eef6;
+      border:1px solid rgba(255,255,255,0.12);
+      padding:8px 12px;
+      border-radius:12px;
+      cursor:pointer;
+      font-weight:650;
+    }
+    .btn:disabled{ opacity:0.55; cursor:not-allowed; }
+    .row{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+    .slider{
+      display:flex; gap:8px; align-items:center;
+      padding:6px 10px;
+      border-radius:12px;
+      background:rgba(255,255,255,0.04);
+      border:1px solid rgba(255,255,255,0.08);
+      font-size:13px;
+      white-space:nowrap;
+    }
+    input[type="range"]{ width:160px; }
+    canvas{
+      width:100%;
+      height:auto;
+      border-radius:16px;
+      background:#0f1722;
+      border:1px solid rgba(255,255,255,0.08);
+      box-shadow: 0 16px 60px rgba(0,0,0,0.45);
+      user-select:none;
+      touch-action: none;
+      display:block;
+    }
+    .footer{
+      margin-top:10px;
+      color:#a9b4c2;
+      font-size:13px;
+      display:flex;
+      justify-content:space-between;
+      flex-wrap:wrap;
+      gap:10px;
+    }
+    .kbd{
+      padding:2px 6px;
+      border:1px solid rgba(255,255,255,0.14);
+      border-bottom-width:2px;
+      border-radius:8px;
+      background:rgba(255,255,255,0.05);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size:12px;
+      color:#dbe7ff;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="top">
+      <div>
+        <div class="title">🎯 Aim Trainer：Falling Targets（越玩越快）</div>
+        <div class="sub">
+          玩法：在时间结束前尽量点中掉落的球。时间越久，生成更频繁、下落更快、球更小。<br/>
+          提示：别乱点（点空会扣连击、影响命中率）。
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="row">
+          <button id="startBtn" class="btn">Start</button>
+          <button id="pauseBtn" class="btn" disabled>Pause</button>
+          <button id="resetBtn" class="btn">Reset</button>
+        </div>
+
+        <div class="row">
+          <div class="stat">Time: <b id="time">30.0</b>s</div>
+          <div class="stat">Score: <b id="score">0</b></div>
+          <div class="stat">Hits: <b id="hits">0</b></div>
+          <div class="stat">Miss: <b id="miss">0</b></div>
+          <div class="stat">Acc: <b id="acc">0</b>%</div>
+          <div class="stat">Combo: <b id="combo">0</b></div>
+        </div>
+
+        <div class="row">
+          <div class="slider">
+            Duration
+            <input id="dur" type="range" min="15" max="90" step="5" value="30">
+            <span id="durVal">30s</span>
+          </div>
+          <div class="slider">
+            Spawn（初始）
+            <input id="spawn" type="range" min="200" max="1200" step="50" value="800">
+            <span id="spawnVal">800ms</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <canvas id="c" width="980" height="560"></canvas>
+
+    <div class="footer">
+      <div id="status">Status: Ready</div>
+      <div>
+        操作：鼠标点击射击 ｜ <span class="kbd">Space</span> 暂停/继续 ｜ <span class="kbd">R</span> 重置
+      </div>
+    </div>
+  </div>
+
+<script>
+(() => {
+  const canvas = document.getElementById("c");
+  const ctx = canvas.getContext("2d");
+
+  const startBtn = document.getElementById("startBtn");
+  const pauseBtn = document.getElementById("pauseBtn");
+  const resetBtn = document.getElementById("resetBtn");
+
+  const timeEl = document.getElementById("time");
+  const scoreEl = document.getElementById("score");
+  const hitsEl = document.getElementById("hits");
+  const missEl = document.getElementById("miss");
+  const accEl = document.getElementById("acc");
+  const comboEl = document.getElementById("combo");
+  const statusEl = document.getElementById("status");
+
+  const durSlider = document.getElementById("dur");
+  const durVal = document.getElementById("durVal");
+  const spawnSlider = document.getElementById("spawn");
+  const spawnVal = document.getElementById("spawnVal");
+
+  const W = canvas.width, H = canvas.height;
+
+  // Game state
+  let running = false;
+  let paused = false;
+
+  let duration = Number(durSlider.value);  // seconds
+  let baseSpawnMs = Number(spawnSlider.value);
+
+  let tLeft = duration;
+  let score = 0;
+  let hits = 0;
+  let miss = 0;
+  let combo = 0;
+
+  // difficulty ramps with elapsed time
+  let startAt = 0;
+  let lastFrame = 0;
+  let lastSpawn = 0;
+  let targets = [];
+
+  // Aim assist: show crosshair
+  let mouse = {x: W/2, y: H/2, down:false};
+
+  function rand(a,b){ return a + Math.random()*(b-a); }
+  function clamp(v,a,b){ return Math.max(a, Math.min(b, v)); }
+
+  function updateUI(){
+    timeEl.textContent = tLeft.toFixed(1);
+    scoreEl.textContent = String(score);
+    hitsEl.textContent = String(hits);
+    missEl.textContent = String(miss);
+    comboEl.textContent = String(combo);
+
+    const totalShots = hits + miss;
+    const acc = totalShots === 0 ? 0 : (hits / totalShots) * 100;
+    accEl.textContent = acc.toFixed(0);
+  }
+
+  function resetGame(){
+    running = false; paused = false;
+    duration = Number(durSlider.value);
+    baseSpawnMs = Number(spawnSlider.value);
+
+    tLeft = duration;
+    score = 0; hits = 0; miss = 0; combo = 0;
+    targets = [];
+
+    startBtn.disabled = false;
+    pauseBtn.disabled = true;
+    pauseBtn.textContent = "Pause";
+
+    statusEl.textContent = "Status: Ready";
+    updateUI();
+    draw(); // show idle screen
+  }
+
+  function difficulty(elapsedSec){
+    // normalized 0..1 over the round
+    const p = clamp(elapsedSec / duration, 0, 1);
+
+    // spawn interval decreases (more frequent)
+    const spawnMs = baseSpawnMs * (1 - 0.65*p);       // up to 65% faster
+    // fall speed increases
+    const speed = 120 + 380*p;                        // px/sec
+    // target radius decreases slightly
+    const r = 26 - 12*p;                              // 26 -> 14
+    // lifetime shortens (harder)
+    const life = 2.2 - 1.0*p;                         // sec
+    // sometimes spawn 2+ at once later
+    const burstChance = 0.05 + 0.20*p;
+
+    return { p, spawnMs, speed, r, life, burstChance };
+  }
+
+  function spawnOne(diff){
+    const r = diff.r * rand(0.85, 1.15);
+    const x = rand(60, W-60);
+    const y = -r - rand(0, 40);
+    const vy = diff.speed * rand(0.9, 1.15);
+    const life = diff.life * rand(0.85, 1.2);
+
+    // scoring weight: smaller + faster => more points
+    const danger = (vy / 200) + (22 / r);
+    const value = Math.round(8 + danger * 6);
+
+    targets.push({
+      x, y, r, vy,
+      born: performance.now(),
+      lifeMs: life * 1000,
+      value,
+      // slight horizontal drift for variety
+      vx: rand(-20, 20)
+    });
+  }
+
+  function startGame(){
+    duration = Number(durSlider.value);
+    baseSpawnMs = Number(spawnSlider.value);
+    tLeft = duration;
+
+    score = 0; hits = 0; miss = 0; combo = 0;
+    targets = [];
+
+    running = true;
+    paused = false;
+    startAt = performance.now();
+    lastFrame = startAt;
+    lastSpawn = startAt;
+
+    startBtn.disabled = true;
+    pauseBtn.disabled = false;
+    pauseBtn.textContent = "Pause";
+
+    statusEl.textContent = "Status: Running";
+    requestAnimationFrame(loop);
+  }
+
+  function endGame(){
+    running = false;
+    paused = false;
+    pauseBtn.disabled = true;
+    startBtn.disabled = false;
+
+    const totalShots = hits + miss;
+    const acc = totalShots === 0 ? 0 : (hits / totalShots) * 100;
+    statusEl.textContent = `Status: Finished — Score ${score}, Acc ${acc.toFixed(0)}%`;
+  }
+
+  function togglePause(){
+    if(!running) return;
+    paused = !paused;
+    pauseBtn.textContent = paused ? "Resume" : "Pause";
+    statusEl.textContent = paused ? "Status: Paused" : "Status: Running";
+    if(!paused){
+      // re-sync timers to avoid time jump
+      const now = performance.now();
+      lastFrame = now;
+      lastSpawn = now;
+      requestAnimationFrame(loop);
+    }
+  }
+
+  function shot(x, y){
+    if(!running || paused) return;
+
+    // check hit: find first target under cursor, prioritize closest
+    let hitIdx = -1;
+    let bestD = Infinity;
+    for(let i=0;i<targets.length;i++){
+      const t = targets[i];
+      const d = Math.hypot(x - t.x, y - t.y);
+      if(d <= t.r){
+        if(d < bestD){
+          bestD = d;
+          hitIdx = i;
+        }
+      }
+    }
+
+    if(hitIdx >= 0){
+      const t = targets[hitIdx];
+      targets.splice(hitIdx, 1);
+
+      hits += 1;
+      combo += 1;
+
+      // combo bonus: grows gently
+      const bonus = Math.floor(Math.min(25, combo) * 0.6);
+      score += (t.value + bonus);
+
+      // tiny "reward": +0.05s for good streak (optional, small)
+      if(combo % 10 === 0) tLeft = Math.min(duration, tLeft + 0.6);
+
+    } else {
+      miss += 1;
+      combo = 0;
+      // small penalty to discourage spam
+      score = Math.max(0, score - 2);
+    }
+
+    updateUI();
+  }
+
+  function update(dtSec, elapsedSec){
+    tLeft = Math.max(0, duration - elapsedSec);
+
+    // spawn logic
+    const diff = difficulty(elapsedSec);
+    const now = performance.now();
+
+    if(now - lastSpawn >= diff.spawnMs){
+      lastSpawn = now;
+
+      spawnOne(diff);
+
+      // bursts later in the game
+      if(Math.random() < diff.burstChance){
+        spawnOne(diff);
+        if(Math.random() < diff.burstChance * 0.5) spawnOne(diff);
+      }
+    }
+
+    // update targets
+    const nowMs = performance.now();
+    for(const t of targets){
+      t.x += t.vx * dtSec;
+      t.y += t.vy * dtSec;
+
+      // bounce horizontally a bit
+      if(t.x < 30 || t.x > W-30) t.vx *= -1;
+    }
+
+    // remove expired or fallen targets (count as miss for you)
+    const before = targets.length;
+    targets = targets.filter(t => {
+      const alive = (nowMs - t.born) <= t.lifeMs && t.y < H + t.r + 40;
+      return alive;
+    });
+    const expired = before - targets.length;
+    if(expired > 0){
+      miss += expired;
+      combo = 0;
+      updateUI();
+    }
+
+    if(tLeft <= 0){
+      endGame();
+    }
+  }
+
+  function draw(){
+    ctx.clearRect(0,0,W,H);
+
+    // background
+    ctx.fillStyle = "#0b0f14";
+    ctx.fillRect(0,0,W,H);
+
+    // arena panel
+    ctx.fillStyle = "#0f1722";
+    ctx.fillRect(18, 18, W-36, H-36);
+
+    // border
+    ctx.strokeStyle = "rgba(255,255,255,0.10)";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(18, 18, W-36, H-36);
+
+    // title inside canvas
+    ctx.fillStyle = "rgba(255,255,255,0.85)";
+    ctx.font = "16px system-ui, sans-serif";
+    ctx.fillText("Click the falling targets. They get faster over time.", 28, 42);
+
+    // difficulty bar
+    let elapsed = running ? (performance.now() - startAt)/1000 : 0;
+    elapsed = clamp(elapsed, 0, duration);
+    const p = duration > 0 ? elapsed/duration : 0;
+    ctx.fillStyle = "rgba(255,255,255,0.12)";
+    ctx.fillRect(28, 54, W-56, 8);
+    ctx.fillStyle = "rgba(255,255,255,0.55)";
+    ctx.fillRect(28, 54, (W-56)*p, 8);
+
+    // targets
+    for(const t of targets){
+      // outer glow
+      ctx.beginPath();
+      ctx.arc(t.x, t.y, t.r+6, 0, Math.PI*2);
+      ctx.fillStyle = "rgba(88,166,255,0.10)";
+      ctx.fill();
+
+      // body
+      ctx.beginPath();
+      ctx.arc(t.x, t.y, t.r, 0, Math.PI*2);
+      ctx.fillStyle = "rgba(88,166,255,0.85)";
+      ctx.fill();
+
+      // inner dot
+      ctx.beginPath();
+      ctx.arc(t.x, t.y, Math.max(3, t.r*0.22), 0, Math.PI*2);
+      ctx.fillStyle = "rgba(255,255,255,0.75)";
+      ctx.fill();
+    }
+
+    // crosshair
+    ctx.save();
+    ctx.translate(mouse.x, mouse.y);
+    ctx.strokeStyle = "rgba(255,255,255,0.65)";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(-12, 0); ctx.lineTo(-4, 0);
+    ctx.moveTo(4, 0); ctx.lineTo(12, 0);
+    ctx.moveTo(0, -12); ctx.lineTo(0, -4);
+    ctx.moveTo(0, 4); ctx.lineTo(0, 12);
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.arc(0,0, 16, 0, Math.PI*2);
+    ctx.strokeStyle = "rgba(255,255,255,0.25)";
+    ctx.stroke();
+    ctx.restore();
+
+    // idle overlay
+    if(!running){
+      ctx.fillStyle = "rgba(0,0,0,0.35)";
+      ctx.fillRect(18,18,W-36,H-36);
+      ctx.fillStyle = "rgba(255,255,255,0.92)";
+      ctx.font = "700 28px system-ui, sans-serif";
+      ctx.fillText("Aim Trainer", 60, H/2 - 10);
+      ctx.font = "14px system-ui, sans-serif";
+      ctx.fillStyle = "rgba(255,255,255,0.75)";
+      ctx.fillText("Press Start to begin. Difficulty ramps up automatically.", 60, H/2 + 18);
+    }
+
+    // paused overlay
+    if(running && paused){
+      ctx.fillStyle = "rgba(0,0,0,0.45)";
+      ctx.fillRect(18,18,W-36,H-36);
+      ctx.fillStyle = "rgba(255,255,255,0.92)";
+      ctx.font = "700 30px system-ui, sans-serif";
+      ctx.fillText("Paused", 60, H/2);
+      ctx.font = "14px system-ui, sans-serif";
+      ctx.fillStyle = "rgba(255,255,255,0.75)";
+      ctx.fillText("Press Space or click Resume.", 60, H/2 + 24);
+    }
+  }
+
+  function loop(now){
+    if(!running || paused) { draw(); return; }
+
+    const dt = Math.min(40, now - lastFrame); // ms
+    lastFrame = now;
+
+    const elapsedSec = (now - startAt) / 1000;
+    update(dt/1000, elapsedSec);
+    updateUI();
+    draw();
+
+    if(running && !paused) requestAnimationFrame(loop);
+  }
+
+  // Mouse / touch handling
+  function canvasPos(e){
+    const rect = canvas.getBoundingClientRect();
+    // scale to canvas internal resolution
+    const sx = canvas.width / rect.width;
+    const sy = canvas.height / rect.height;
+    return {
+      x: (e.clientX - rect.left) * sx,
+      y: (e.clientY - rect.top) * sy
+    };
+  }
+
+  canvas.addEventListener("mousemove", (e) => {
+    const p = canvasPos(e);
+    mouse.x = p.x; mouse.y = p.y;
+  });
+
+  canvas.addEventListener("mousedown", (e) => {
+    const p = canvasPos(e);
+    mouse.x = p.x; mouse.y = p.y;
+    shot(p.x, p.y);
+  });
+
+  // Touch: tap to shoot
+  canvas.addEventListener("touchstart", (e) => {
+    e.preventDefault();
+    const t = e.changedTouches[0];
+    const rect = canvas.getBoundingClientRect();
+    const sx = canvas.width / rect.width;
+    const sy = canvas.height / rect.height;
+    const x = (t.clientX - rect.left) * sx;
+    const y = (t.clientY - rect.top) * sy;
+    mouse.x = x; mouse.y = y;
+    shot(x, y);
+  }, {passive:false});
+
+  // Controls
+  startBtn.addEventListener("click", startGame);
+  pauseBtn.addEventListener("click", togglePause);
+  resetBtn.addEventListener("click", resetGame);
+
+  window.addEventListener("keydown", (e) => {
+    if(e.code === "Space"){
+      e.preventDefault();
+      if(running) togglePause();
+      return;
+    }
+    if(e.key === "r" || e.key === "R"){
+      resetGame();
+    }
+  });
+
+  // sliders
+  function syncSliders(){
+    durVal.textContent = `${durSlider.value}s`;
+    spawnVal.textContent = `${spawnSlider.value}ms`;
+  }
+  durSlider.addEventListener("input", syncSliders);
+  spawnSlider.addEventListener("input", syncSliders);
+  syncSliders();
+
+  // init
+  resetGame();
+})();
+</script>
+</body>
+</html>

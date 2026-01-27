@@ -3,1090 +3,1157 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>恐龙大作战 - Dino Battle</title>
+  <title>恐龙大作战 (Dino Battle)</title>
   <style>
-    :root { --bg:#0b1020; --panel:rgba(20,30,60,.78); --text:#e9eefc; --muted:#b7c4ff; --accent:#7cf; --warn:#ffcc66; --danger:#ff667a; }
-    html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,"PingFang SC","Microsoft YaHei",sans-serif;}
-    #wrap{height:100%;display:flex;align-items:center;justify-content:center;}
-    canvas{background: radial-gradient(1200px 600px at 50% 35%, #18255b 0%, #0b1020 60%, #070a16 100%); border:1px solid rgba(255,255,255,.12); border-radius:14px; box-shadow:0 18px 60px rgba(0,0,0,.45);}
-    .hud{
-      position:fixed;left:16px;top:16px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;
-      background:var(--panel);padding:10px 12px;border:1px solid rgba(255,255,255,.12);border-radius:12px;
-      backdrop-filter: blur(8px);
+    html, body { margin: 0; padding: 0; background: #0b1020; color: #e8ecff; font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; }
+    .wrap { display: grid; place-items: center; min-height: 100vh; }
+    canvas { background: radial-gradient(1200px 800px at 60% 40%, #18234a 0%, #0b1020 55%, #070a14 100%); border: 1px solid rgba(255,255,255,.12); border-radius: 14px; box-shadow: 0 12px 40px rgba(0,0,0,.45); }
+    .hud {
+      position: fixed; top: 10px; left: 10px; right: 10px;
+      display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+      pointer-events: none;
     }
-    .hud b{color:var(--accent)}
-    .pill{padding:4px 8px;border-radius:999px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);font-size:12px}
-    .rightHud{
-      position:fixed;right:16px;top:16px;display:flex;flex-direction:column;gap:10px;min-width:240px;
+    .pill {
+      background: rgba(255,255,255,.08);
+      border: 1px solid rgba(255,255,255,.12);
+      border-radius: 999px;
+      padding: 8px 12px;
+      font-size: 14px;
+      backdrop-filter: blur(6px);
+      pointer-events: none;
+      user-select: none;
     }
-    .panel{
-      background:var(--panel);padding:10px 12px;border:1px solid rgba(255,255,255,.12);border-radius:12px;
-      backdrop-filter: blur(8px);
+    .hint { position: fixed; bottom: 10px; left: 10px; right: 10px; opacity: .85; font-size: 13px; }
+    .hint .pill { pointer-events: none; }
+
+    /* Overlay panels */
+    .overlay {
+      position: fixed; inset: 0; display: none; align-items: center; justify-content: center;
+      background: rgba(0,0,0,.55);
+      backdrop-filter: blur(6px);
+      z-index: 50;
     }
-    .bar{
-      height:10px;border-radius:999px;background:rgba(255,255,255,.12);overflow:hidden;border:1px solid rgba(255,255,255,.12);
+    .panel {
+      width: min(680px, calc(100vw - 28px));
+      background: rgba(12,16,36,.96);
+      border: 1px solid rgba(255,255,255,.14);
+      border-radius: 16px;
+      box-shadow: 0 18px 60px rgba(0,0,0,.55);
+      overflow: hidden;
     }
-    .bar > div{height:100%;background:linear-gradient(90deg, #7cf, #8f7cff);}
-    .bar.danger > div{background:linear-gradient(90deg, #ff667a, #ffcc66);}
-    .centerOverlay{
-      position:fixed;inset:0;display:none;align-items:center;justify-content:center;padding:18px;
-      background:rgba(0,0,0,.55);
+    .panel header {
+      padding: 14px 16px;
+      display: flex; align-items: center; justify-content: space-between;
+      border-bottom: 1px solid rgba(255,255,255,.10);
     }
-    .modal{
-      width:min(780px, 96vw);max-height:88vh;overflow:auto;
-      background:rgba(18,24,45,.92);border:1px solid rgba(255,255,255,.14);border-radius:16px;padding:16px 16px 12px;
-      box-shadow:0 22px 80px rgba(0,0,0,.55);backdrop-filter: blur(10px);
+    .panel header h2 { margin: 0; font-size: 16px; letter-spacing: .3px; }
+    .panel header .sub { opacity: .75; font-size: 13px; }
+    .panel main { padding: 14px 16px; display: grid; gap: 12px; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    @media (max-width: 620px) { .grid { grid-template-columns: 1fr; } }
+
+    .card {
+      border-radius: 14px;
+      border: 1px solid rgba(255,255,255,.12);
+      background: rgba(255,255,255,.06);
+      padding: 12px;
+      display: grid;
+      gap: 6px;
     }
-    .modal h2{margin:0 0 10px 0;font-size:18px}
-    .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
-    button{
-      background:rgba(255,255,255,.10);border:1px solid rgba(255,255,255,.16);color:var(--text);
-      padding:9px 12px;border-radius:12px;cursor:pointer;font-weight:600;
+    .row { display:flex; align-items:center; justify-content: space-between; gap: 10px; }
+    .btn {
+      pointer-events: auto;
+      cursor: pointer;
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,.18);
+      background: rgba(255,255,255,.10);
+      color: #e8ecff;
+      padding: 9px 11px;
+      font-size: 13px;
+      transition: transform .06s ease, background .2s ease, border-color .2s ease;
+      user-select: none;
     }
-    button:hover{background:rgba(255,255,255,.16)}
-    button.primary{background:rgba(124,255,255,.16);border-color:rgba(124,255,255,.35)}
-    button.danger{background:rgba(255,102,122,.14);border-color:rgba(255,102,122,.35)}
-    .list{margin-top:10px;display:grid;gap:8px}
-    .item{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:10px 12px;border-radius:12px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12)}
-    .item small{color:var(--muted)}
-    .kbd{font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-      font-size:12px;padding:2px 7px;border-radius:8px;background:rgba(255,255,255,.10);border:1px solid rgba(255,255,255,.14)}
+    .btn:hover { background: rgba(255,255,255,.14); border-color: rgba(255,255,255,.26); }
+    .btn:active { transform: translateY(1px); }
+    .btn.primary { background: rgba(99,143,255,.22); border-color: rgba(99,143,255,.40); }
+    .btn.danger { background: rgba(255,99,132,.18); border-color: rgba(255,99,132,.35); }
+    .muted { opacity: .8; font-size: 13px; }
+    .k { opacity: .9; font-size: 12px; }
+    .big { font-size: 18px; font-weight: 700; }
     input[type="text"]{
-      background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.18);color:var(--text);
-      padding:9px 10px;border-radius:10px;outline:none;min-width:220px;
+      width: 100%;
+      box-sizing: border-box;
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,.18);
+      background: rgba(255,255,255,.06);
+      color: #e8ecff;
+      padding: 10px 12px;
+      outline: none;
+      font-size: 14px;
     }
-    .note{color:var(--muted);font-size:12px;line-height:1.45}
-    .twoCol{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-    @media (max-width:720px){ .twoCol{grid-template-columns:1fr} .rightHud{display:none} }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th, td { padding: 8px 6px; border-bottom: 1px solid rgba(255,255,255,.10); text-align: left; }
+    th { opacity: .85; font-weight: 600; }
+    .tag { font-size: 12px; padding: 3px 8px; border-radius: 999px; border: 1px solid rgba(255,255,255,.18); background: rgba(255,255,255,.08); }
+    .ok { color: #93ffb9; }
+    .warn { color: #ffd28a; }
   </style>
 </head>
 <body>
-  <div id="wrap">
-    <canvas id="game" width="980" height="620"></canvas>
+  <div class="hud">
+    <div class="pill" id="hudStage">World 1 / Stage 1</div>
+    <div class="pill" id="hudTime">Time: 180</div>
+    <div class="pill" id="hudHP">HP: ❤❤❤</div>
+    <div class="pill" id="hudRevive">Revive: 1</div>
+    <div class="pill" id="hudGold">Gold: 0</div>
+    <div class="pill" id="hudScore">Score: 0</div>
+    <div class="pill" id="hudUpg">DMG x1 | Size x1 | Radial: OFF</div>
   </div>
 
-  <div class="hud" id="hud">
-    <span class="pill">HP: <b id="hp">3</b> / <span id="hpMax">3</span></span>
-    <span class="pill">复活: <b id="rev">1</b></span>
-    <span class="pill">金币: <b id="gold">0</b></span>
-    <span class="pill">击杀: <b id="kills">0</b></span>
-    <span class="pill">分数: <b id="score">0</b></span>
-    <span class="pill">关卡: <b id="stage">W1-S1</b></span>
-    <span class="pill">剩余: <b id="time">180</b>s</span>
-    <span class="pill">模式: <b id="mode">单发</b></span>
-    <span class="pill">商店 <span class="kbd">B</span></span>
+  <div class="wrap">
+    <canvas id="c" width="960" height="540"></canvas>
   </div>
 
-  <div class="rightHud">
+  <div class="hint">
+    <div class="pill">操作：WASD/方向键移动｜B 商店｜Esc 关闭商店｜R 重开｜自动吐火球（瞄准最近敌人）</div>
+  </div>
+
+  <!-- Shop overlay -->
+  <div class="overlay" id="shopOverlay">
     <div class="panel">
-      <div style="display:flex;justify-content:space-between;gap:10px;align-items:center">
-        <div><b>Boss</b> <small id="bossName" style="color:var(--muted)">(无)</small></div>
-        <small id="bossHint" style="color:var(--muted)">第5小关会出现</small>
-      </div>
-      <div class="bar danger" style="margin-top:8px"><div id="bossBar" style="width:0%"></div></div>
+      <header>
+        <div>
+          <h2>商店（按 Esc 关闭）</h2>
+          <div class="sub">金币来自击杀敌人（每个敌人 +1 金币）</div>
+        </div>
+        <button class="btn danger" id="btnCloseShop">关闭</button>
+      </header>
+      <main>
+        <div class="row">
+          <div class="big">当前金币：<span id="shopGold">0</span></div>
+          <div class="muted">升级都是 <span class="tag">永久</span> 生效（直到本局结束）</div>
+        </div>
+
+        <div class="grid">
+          <div class="card">
+            <div class="row"><div class="big">100 金币</div><div class="tag">伤害翻倍</div></div>
+            <div class="muted">DMG ×2（可叠加）</div>
+            <button class="btn primary" id="buy100">购买</button>
+            <div class="k" id="buy100State"></div>
+          </div>
+
+          <div class="card">
+            <div class="row"><div class="big">200 金币</div><div class="tag">翻倍+变大</div></div>
+            <div class="muted">DMG ×2（可叠加） + 火球大小 ×2</div>
+            <button class="btn primary" id="buy200">购买</button>
+            <div class="k" id="buy200State"></div>
+          </div>
+
+          <div class="card">
+            <div class="row"><div class="big">300 金币</div><div class="tag">八向散射</div></div>
+            <div class="muted">每次发射变成 8 方向发散火球</div>
+            <button class="btn primary" id="buy300">购买</button>
+            <div class="k" id="buy300State"></div>
+          </div>
+
+          <div class="card">
+            <div class="row"><div class="big">600 金币</div><div class="tag">皮肤</div></div>
+            <div class="muted">粉色小恐龙（外观）</div>
+            <button class="btn primary" id="buy600">购买</button>
+            <div class="k" id="buy600State"></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="row"><div class="big">已获得的随机技能（掉落）</div><div class="tag">永久加成</div></div>
+          <div class="muted" id="skillList">暂无</div>
+        </div>
+      </main>
     </div>
+  </div>
+
+  <!-- Game over overlay -->
+  <div class="overlay" id="endOverlay">
     <div class="panel">
-      <b>永久加成</b>
-      <div class="note" id="buffs" style="margin-top:6px">暂无</div>
-      <div class="note" style="margin-top:10px">
-        操作：<span class="kbd">WASD</span>/<span class="kbd">↑↓←→</span> 移动，<span class="kbd">Enter</span> 开始/重开，<span class="kbd">B</span> 商店，<span class="kbd">Esc</span> 关闭窗口
-      </div>
+      <header>
+        <div>
+          <h2 id="endTitle">游戏结束</h2>
+          <div class="sub" id="endSub">保存到本地排行榜（只在你这台电脑/浏览器有效）</div>
+        </div>
+        <button class="btn" id="btnRestart">重新开始 (R)</button>
+      </header>
+      <main>
+        <div class="card">
+          <div class="row"><div class="big">本局结算</div><div class="tag" id="endTag">—</div></div>
+          <div class="muted" id="endStats">—</div>
+        </div>
+
+        <div class="card">
+          <div class="row"><div class="big">你的名字</div><span class="tag">用于排行榜</span></div>
+          <input id="nameInput" type="text" maxlength="16" placeholder="输入名字（比如 Fang）" />
+          <div class="row">
+            <button class="btn primary" id="btnSave">保存成绩</button>
+            <button class="btn" id="btnViewBoard">查看排行榜</button>
+            <button class="btn danger" id="btnClearBoard">清空排行榜</button>
+          </div>
+          <div class="k" id="saveHint"></div>
+        </div>
+
+        <div class="card" id="boardCard" style="display:none;">
+          <div class="row"><div class="big">排行榜 Top 10</div><span class="tag">localStorage</span></div>
+          <div id="boardTable"></div>
+        </div>
+      </main>
     </div>
   </div>
 
-  <!-- Overlay / Modals -->
-  <div class="centerOverlay" id="overlay">
-    <div class="modal" id="modal"></div>
-  </div>
+<script>
+(() => {
+  // ===== Canvas =====
+  const canvas = document.getElementById('c');
+  const ctx = canvas.getContext('2d');
 
-  <script>
-  (() => {
-    // ---------- Helpers ----------
-    const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
-    const rand = (a, b) => a + Math.random() * (b - a);
-    const randi = (a, b) => Math.floor(rand(a, b + 1));
-    const dist2 = (ax, ay, bx, by) => {
-      const dx = ax - bx, dy = ay - by;
-      return dx*dx + dy*dy;
-    };
-    const now = () => performance.now();
+  // ===== HUD elements =====
+  const hudStage = document.getElementById('hudStage');
+  const hudTime  = document.getElementById('hudTime');
+  const hudHP    = document.getElementById('hudHP');
+  const hudRevive= document.getElementById('hudRevive');
+  const hudGold  = document.getElementById('hudGold');
+  const hudScore = document.getElementById('hudScore');
+  const hudUpg   = document.getElementById('hudUpg');
 
-    // ---------- Canvas ----------
-    const canvas = document.getElementById('game');
-    const ctx = canvas.getContext('2d');
-    const W = canvas.width, H = canvas.height;
+  // ===== Overlays =====
+  const shopOverlay = document.getElementById('shopOverlay');
+  const endOverlay = document.getElementById('endOverlay');
 
-    // ---------- UI ----------
-    const ui = {
-      hp: document.getElementById('hp'),
-      hpMax: document.getElementById('hpMax'),
-      rev: document.getElementById('rev'),
-      gold: document.getElementById('gold'),
-      kills: document.getElementById('kills'),
-      score: document.getElementById('score'),
-      stage: document.getElementById('stage'),
-      time: document.getElementById('time'),
-      mode: document.getElementById('mode'),
-      buffs: document.getElementById('buffs'),
-      bossName: document.getElementById('bossName'),
-      bossHint: document.getElementById('bossHint'),
-      bossBar: document.getElementById('bossBar'),
-      overlay: document.getElementById('overlay'),
-      modal: document.getElementById('modal')
-    };
+  // Shop UI
+  const shopGold = document.getElementById('shopGold');
+  const skillList = document.getElementById('skillList');
+  const buy100State = document.getElementById('buy100State');
+  const buy200State = document.getElementById('buy200State');
+  const buy300State = document.getElementById('buy300State');
+  const buy600State = document.getElementById('buy600State');
 
-    function showOverlay(html) {
-      ui.modal.innerHTML = html;
-      ui.overlay.style.display = 'flex';
-      overlayOpen = true;
+  // End UI
+  const endTitle = document.getElementById('endTitle');
+  const endSub = document.getElementById('endSub');
+  const endStats = document.getElementById('endStats');
+  const endTag = document.getElementById('endTag');
+  const nameInput = document.getElementById('nameInput');
+  const saveHint = document.getElementById('saveHint');
+  const boardCard = document.getElementById('boardCard');
+  const boardTable = document.getElementById('boardTable');
+
+  // Buttons
+  document.getElementById('btnCloseShop').onclick = () => closeShop();
+  document.getElementById('buy100').onclick = () => buyItem('buy100');
+  document.getElementById('buy200').onclick = () => buyItem('buy200');
+  document.getElementById('buy300').onclick = () => buyItem('buy300');
+  document.getElementById('buy600').onclick = () => buyItem('buy600');
+
+  document.getElementById('btnRestart').onclick = () => restart();
+  document.getElementById('btnSave').onclick = () => saveScore();
+  document.getElementById('btnViewBoard').onclick = () => { boardCard.style.display = ''; renderBoard(); };
+  document.getElementById('btnClearBoard').onclick = () => clearBoard();
+
+  // ===== Game constants =====
+  const W = canvas.width, H = canvas.height;
+
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const dist2 = (ax, ay, bx, by) => {
+    const dx = ax - bx, dy = ay - by;
+    return dx*dx + dy*dy;
+  };
+  const rand = (a, b) => a + Math.random() * (b - a);
+
+  // ===== Input =====
+  const keys = new Set();
+  window.addEventListener('keydown', (e) => {
+    if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(e.key)) e.preventDefault();
+    keys.add(e.key.toLowerCase());
+
+    if (e.key.toLowerCase() === 'b') {
+      if (!state.ended) toggleShop();
     }
-    function hideOverlay() {
-      ui.overlay.style.display = 'none';
-      ui.modal.innerHTML = '';
-      overlayOpen = false;
+    if (e.key === 'Escape') {
+      if (state.shopOpen) closeShop();
     }
+    if (e.key.toLowerCase() === 'r') {
+      restart();
+    }
+  }, { passive: false });
+  window.addEventListener('keyup', (e) => keys.delete(e.key.toLowerCase()));
 
-    // ---------- Game State ----------
-    let keys = new Set();
-    let overlayOpen = true;
-    let running = false;
-
-    const STORAGE_KEY = 'dino_battle_leaderboard_v1';
-
-    const game = {
-      t: 0,
-      last: 0,
-      accum: 0,
-      dtFixed: 1000/60,
-      world: 1,
-      stage: 1,         // 1..5 within world
-      stageTime: 180,   // seconds per small stage
-      stageLeft: 180,
-      totalKills: 0,
-      score: 0,
-      gold: 0,
-
-      // weapon/shop
-      weaponMode: 'single',  // single | auto | burst | scatter
-      scatter: false,
-      dmgMult: 1,
-      ballScale: 1,
-
-      // buffs (permanent)
-      buff_move: 0,      // +%
-      buff_dmg: 0,
-      buff_rate: 0,
-      buff_ballSpeed: 0,
-      buff_hpMax: 0,
-
-      // revive
-      reviveLeft: 1,
-
-      // stage difficulty parameters (change with world & stage)
-      spawnTimer: 0,
-      enemyCap: 6,
-      spawnInterval: 900, // ms
-      enemySpeed: 60,     // px/s
-      rangedChance: 0.0,  // 0..1
-      enemyHP: 1,
-
-      // boss
-      boss: null,
-      bossSpawned: false,
-      finalBoss: false
-    };
-
-    const player = {
-      x: W*0.5,
-      y: H*0.5,
+  // ===== Entities =====
+  function makePlayer() {
+    return {
+      x: W/2, y: H/2,
       r: 16,
-      speed: 220,
+      speed: 240, // px/sec
       hpMax: 3,
       hp: 3,
-      invuln: 0,
-      color: '#7cf',
-      skin: 'default', // default | pink
+      reviveLeft: 1,
+      color: '#8cffb1', // default green
+      skinPink: false,
+      invuln: 0, // seconds
+    };
+  }
+
+  function makeEnemy(kind, x, y, cfg) {
+    // kind: 'melee' or 'ranged' or 'boss'
+    const base = {
+      x, y,
+      vx: 0, vy: 0,
+      alive: true,
+      hitFlash: 0,
+      kind,
+      fireCd: 0,
+    };
+    if (kind === 'boss') {
+      return {
+        ...base,
+        r: cfg.bossRadius,
+        hpMax: cfg.bossHP,
+        hp: cfg.bossHP,
+        speed: cfg.bossSpeed,
+        dmgTouch: 1,
+        color: '#ffcf6b',
+        isBoss: true,
+        ranged: cfg.bossRanged,
+        fireRate: cfg.bossFireRate,
+        bulletSpeed: cfg.bossBulletSpeed,
+      };
+    }
+    const isRanged = (kind === 'ranged');
+    return {
+      ...base,
+      r: isRanged ? 14 : 12,
+      hpMax: isRanged ? 2 : 1,
+      hp: isRanged ? 2 : 1,
+      speed: cfg.enemySpeed * (isRanged ? 0.95 : 1.05),
+      dmgTouch: 1,
+      color: isRanged ? '#8ad0ff' : '#ff7aa8',
+      ranged: isRanged,
+      fireRate: isRanged ? cfg.rangedFireRate : 0,
+      bulletSpeed: isRanged ? cfg.rangedBulletSpeed : 0,
+    };
+  }
+
+  function makeBullet(x, y, vx, vy, r, dmg, from) {
+    return { x, y, vx, vy, r, dmg, from, alive: true };
+  }
+
+  function makeDrop(x, y, type, label) {
+    return { x, y, r: 10, type, label, alive: true, t: 0 };
+  }
+
+  // ===== Progression config =====
+  // 3 worlds, each 5 stages, each stage 180 seconds
+  function stageConfig(world, stage) {
+    // world: 1..3, stage: 1..5
+    const depth = (world - 1) * 5 + (stage - 1); // 0..14
+    const spawnInterval = clamp(1.35 - depth * 0.06, 0.45, 1.35);
+    const maxEnemies = clamp(6 + depth * 1.2, 6, 26);
+    const enemySpeed = 105 + depth * 8;
+    const rangedChance = clamp((depth - 5) * 0.06, 0, 0.55); // after ~world2
+    const rangedFireRate = clamp(1.25 - depth * 0.03, 0.6, 1.25);
+    const rangedBulletSpeed = 200 + depth * 10;
+
+    // Boss settings
+    const isBossStage = (stage === 5);
+    const bossHP = isBossStage ? Math.round(60 + depth * 10) : 0;
+    const bossSpeed = 95 + depth * 4;
+    const bossRadius = 26 + world * 4;
+    const bossRanged = (world >= 2); // later bosses can shoot
+    const bossFireRate = clamp(0.95 - depth * 0.02, 0.45, 0.95);
+    const bossBulletSpeed = 260 + depth * 12;
+
+    return {
+      spawnInterval,
+      maxEnemies,
+      enemySpeed,
+      rangedChance,
+      rangedFireRate,
+      rangedBulletSpeed,
+      isBossStage,
+      bossHP,
+      bossSpeed,
+      bossRadius,
+      bossRanged,
+      bossFireRate,
+      bossBulletSpeed,
+    };
+  }
+
+  const FINAL_BOSS = {
+    hp: 380,
+    radius: 34,
+    speed: 110,
+    fireRate: 0.5,
+    bulletSpeed: 360,
+  };
+
+  // ===== State =====
+  let state;
+  function resetState() {
+    state = {
+      player: makePlayer(),
+      enemies: [],
+      bullets: [],
+      drops: [],
+      gold: 0,
+      kills: 0,
+      score: 0,
+
+      // upgrades
+      dmgMult: 1,
+      sizeMult: 1,
+      radial: false,
+      bought: { buy100: 0, buy200: 0, buy300: 0, buy600: 0 },
+
+      // skill buffs (permanent this run)
+      buffs: {
+        speed: 0,     // percent
+        dmg: 0,       // percent
+        fireRate: 0,  // percent
+        projSpeed: 0, // percent
+        hpMax: 0,     // flat
+      },
+
+      // progression
+      world: 1,
+      stage: 1,
+      stageTimeLeft: 180,
+      stageElapsed: 0,
+      spawnCd: 0,
+      bossAlive: false,
+      finalBoss: false,
 
       // shooting
-      fireTimer: 0,
-      fireInterval: 520, // ms (base)
-      bulletSpeed: 420,
-      bulletRadius: 6,
-      bulletLife: 1.2, // sec
-      burstLeft: 0,
-      burstGap: 110, // ms between burst shots
-      burstTimer: 0
+      shootCd: 0,
+
+      // UI
+      shopOpen: false,
+      ended: false,
+      win: false,
+      runTime: 0,
     };
+  }
+  resetState();
 
-    const bullets = [];
-    const enemies = [];
-    const drops = [];
-    const enemyBullets = [];
+  // ===== Shop logic =====
+  function toggleShop() {
+    if (state.shopOpen) closeShop();
+    else openShop();
+  }
+  function openShop() {
+    state.shopOpen = true;
+    shopOverlay.style.display = 'flex';
+    updateShopUI();
+  }
+  function closeShop() {
+    state.shopOpen = false;
+    shopOverlay.style.display = 'none';
+  }
+  function buyItem(id) {
+    const costs = { buy100: 100, buy200: 200, buy300: 300, buy600: 600 };
+    const cost = costs[id];
+    if (state.gold < cost) return;
 
-    // ---------- Difficulty / Progression ----------
-    function applyStageParams() {
-      // Difficulty curve based on world (1-3) and stage (1-5)
-      const w = game.world, s = game.stage;
-      const prog = (w-1)*5 + (s-1); // 0..14
-      // base
-      game.enemyCap = 6 + prog; // grows
-      game.spawnInterval = clamp(900 - prog*35, 260, 900);
-      game.enemySpeed = 70 + prog*6;
-      game.enemyHP = 1 + Math.floor(prog/4); // 1..4-ish
-      game.rangedChance = clamp((prog - 6) / 10, 0, 0.65); // ranged after some progress
-      game.spawnTimer = 0;
+    // One-time for 300 / 600, multi-buy for 100/200 allowed but limited to avoid crazy
+    if ((id === 'buy300' || id === 'buy600') && state.bought[id] >= 1) return;
+    if ((id === 'buy100' || id === 'buy200') && state.bought[id] >= 3) return; // cap stacking
+    state.gold -= cost;
+    state.bought[id]++;
 
-      // Boss note UI
-      if (game.stage === 5 && !game.finalBoss) {
-        ui.bossHint.textContent = '本小关末尾会刷小Boss';
-      } else if (game.finalBoss) {
-        ui.bossHint.textContent = '最终Boss战！';
-      } else {
-        ui.bossHint.textContent = '第5小关会出现';
-      }
+    if (id === 'buy100') {
+      state.dmgMult *= 2;
+    } else if (id === 'buy200') {
+      state.dmgMult *= 2;
+      state.sizeMult *= 2;
+    } else if (id === 'buy300') {
+      state.radial = true;
+    } else if (id === 'buy600') {
+      state.player.skinPink = true;
+      state.player.color = '#ff79d9';
     }
+    updateShopUI();
+  }
 
-    function stageLabel() { return `W${game.world}-S${game.stage}`; }
+  function updateShopUI() {
+    shopGold.textContent = state.gold.toString();
+    buy100State.textContent = state.bought.buy100 ? `已购买 ${state.bought.buy100} 次（上限 3）` : '可购买（可叠加，上限 3）';
+    buy200State.textContent = state.bought.buy200 ? `已购买 ${state.bought.buy200} 次（上限 3）` : '可购买（可叠加，上限 3）';
+    buy300State.textContent = state.bought.buy300 ? '已购买 ✅' : '可购买（一次）';
+    buy600State.textContent = state.bought.buy600 ? '已购买 ✅' : '可购买（一次）';
 
-    function updateBuffUI() {
-      const parts = [];
-      if (game.buff_move) parts.push(`移速 +${Math.round(game.buff_move*100)}%`);
-      if (game.buff_dmg) parts.push(`伤害 +${Math.round(game.buff_dmg*100)}%`);
-      if (game.buff_rate) parts.push(`射速 +${Math.round(game.buff_rate*100)}%`);
-      if (game.buff_ballSpeed) parts.push(`火球速度 +${Math.round(game.buff_ballSpeed*100)}%`);
-      if (game.buff_hpMax) parts.push(`最大血量 +${game.buff_hpMax}`);
-      ui.buffs.textContent = parts.length ? parts.join(' · ') : '暂无';
+    const list = [];
+    if (state.buffs.speed) list.push(`移速 +${state.buffs.speed}%`);
+    if (state.buffs.dmg) list.push(`伤害 +${state.buffs.dmg}%`);
+    if (state.buffs.fireRate) list.push(`射速 +${state.buffs.fireRate}%`);
+    if (state.buffs.projSpeed) list.push(`火球速度 +${state.buffs.projSpeed}%`);
+    if (state.buffs.hpMax) list.push(`最大血量 +${state.buffs.hpMax}`);
+    skillList.textContent = list.length ? list.join(' ｜ ') : '暂无';
+  }
+
+  // ===== Leaderboard =====
+  const LS_KEY = 'dino_battle_leaderboard_v1';
+  function loadBoard() {
+    try { return JSON.parse(localStorage.getItem(LS_KEY) || '[]'); }
+    catch { return []; }
+  }
+  function saveBoard(entries) {
+    localStorage.setItem(LS_KEY, JSON.stringify(entries));
+  }
+  function renderBoard() {
+    const entries = loadBoard().slice(0, 10);
+    if (!entries.length) {
+      boardTable.innerHTML = `<div class="muted">暂无记录</div>`;
+      return;
     }
+    const rows = entries.map((e, i) => `
+      <tr>
+        <td>${i+1}</td>
+        <td>${escapeHtml(e.name)}</td>
+        <td>${e.score}</td>
+        <td>${e.kills}</td>
+        <td>${e.time}s</td>
+        <td>${e.date}</td>
+      </tr>
+    `).join('');
+    boardTable.innerHTML = `
+      <table>
+        <thead>
+          <tr><th>#</th><th>名字</th><th>分数</th><th>击杀</th><th>用时</th><th>日期</th></tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    `;
+  }
+  function clearBoard() {
+    localStorage.removeItem(LS_KEY);
+    renderBoard();
+    saveHint.textContent = '排行榜已清空。';
+  }
+  function saveScore() {
+    const name = (nameInput.value || '').trim() || 'Anonymous';
+    const entries = loadBoard();
+    const now = new Date();
+    const date = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+    const record = {
+      name,
+      score: state.score,
+      kills: state.kills,
+      time: Math.floor(state.runTime),
+      date
+    };
+    entries.push(record);
+    entries.sort((a,b) => b.score - a.score);
+    saveBoard(entries.slice(0, 30));
+    saveHint.innerHTML = `<span class="ok">已保存！</span> 现在可以点“查看排行榜”。`;
+    renderBoard();
+    boardCard.style.display = '';
+  }
 
-    function weaponName() {
-      if (game.scatter) return '散射';
-      if (game.weaponMode === 'auto') return '全自动';
-      if (game.weaponMode === 'burst') return '三连发';
-      return '单发';
+  function escapeHtml(s) {
+    return s.replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  // ===== Combat & drops =====
+  function currentFireInterval() {
+    // base fire interval in seconds
+    const base = 0.42; // feels good
+    const fr = 1 + state.buffs.fireRate / 100;
+    return base / fr;
+  }
+  function playerDamage() {
+    const buff = 1 + state.buffs.dmg / 100;
+    return 1 * state.dmgMult * buff;
+  }
+  function projectileSpeed() {
+    const buff = 1 + state.buffs.projSpeed / 100;
+    return 420 * buff;
+  }
+
+  function spawnEnemy() {
+    const cfg = stageConfig(state.world, state.stage);
+    if (state.enemies.length >= cfg.maxEnemies) return;
+
+    // avoid spawning too close to player
+    let x, y;
+    const p = state.player;
+    for (let i=0; i<20; i++) {
+      x = rand(20, W-20);
+      y = rand(20, H-20);
+      if (dist2(x,y,p.x,p.y) > 160*160) break;
     }
+    const kind = (Math.random() < cfg.rangedChance) ? 'ranged' : 'melee';
+    state.enemies.push(makeEnemy(kind, x, y, cfg));
+  }
 
-    function syncUI() {
-      ui.hp.textContent = player.hp;
-      ui.hpMax.textContent = player.hpMax;
-      ui.rev.textContent = game.reviveLeft;
-      ui.gold.textContent = game.gold;
-      ui.kills.textContent = game.totalKills;
-      ui.score.textContent = game.score;
-      ui.stage.textContent = stageLabel();
-      ui.time.textContent = Math.ceil(game.stageLeft);
-      ui.mode.textContent = weaponName();
+  function spawnStageBoss() {
+    const cfg = stageConfig(state.world, state.stage);
+    if (!cfg.isBossStage) return;
+    if (state.bossAlive) return;
+    state.bossAlive = true;
 
-      // boss ui
-      if (game.boss) {
-        ui.bossName.textContent = `(${game.boss.name})`;
-        const pct = clamp(game.boss.hp / game.boss.hpMax, 0, 1) * 100;
-        ui.bossBar.style.width = pct.toFixed(1) + '%';
-      } else {
-        ui.bossName.textContent = '(无)';
-        ui.bossBar.style.width = '0%';
-      }
-      updateBuffUI();
-    }
-
-    // ---------- Entities ----------
-    function spawnEnemy() {
-      // Spawn anywhere, but not too close to player
-      let x, y, tries = 0;
-      do {
-        x = rand(20, W-20);
-        y = rand(20, H-20);
-        tries++;
-      } while (tries < 30 && dist2(x,y, player.x,player.y) < 150*150);
-
-      const ranged = Math.random() < game.rangedChance;
-      enemies.push({
-        x, y,
-        r: ranged ? 14 : 13,
-        speed: game.enemySpeed * rand(0.85, 1.15),
-        hp: game.enemyHP,
-        hpMax: game.enemyHP,
-        touchCD: 0,
-        ranged,
-        shootCD: rand(0.6, 1.6),
-        shootRate: ranged ? rand(1.3, 2.2) : 999,
-        color: ranged ? '#ffcc66' : '#a9ff9c'
-      });
-    }
-
-    function spawnBoss(kind) {
-      const isFinal = kind === 'final';
-      const boss = {
-        x: rand(W*0.25, W*0.75),
-        y: rand(H*0.25, H*0.75),
-        r: isFinal ? 34 : 26,
-        speed: isFinal ? 88 : 78,
-        hpMax: isFinal ? (140 + (game.world-1)*40) : (60 + (game.world-1)*20),
-        hp: 0,
-        name: isFinal ? '大Boss（远古暴龙）' : '小Boss（精英恐龙）',
-        phase: 0,
-        shootCD: isFinal ? 0.8 : 1.2,
-        shootRate: isFinal ? 0.65 : 1.05,
-        color: isFinal ? '#ff667a' : '#8f7cff'
-      };
-      boss.hp = boss.hpMax;
-      game.boss = boss;
-      game.bossSpawned = true;
-    }
-
-    function shootPlayer(targetX, targetY, multi = 1) {
-      const baseDmg = 1;
-      const dmg = baseDmg * game.dmgMult * (1 + game.buff_dmg);
-      const speed = player.bulletSpeed * (1 + game.buff_ballSpeed);
-      const r = player.bulletRadius * game.ballScale;
-
-      const dx = targetX - player.x;
-      const dy = targetY - player.y;
-      const len = Math.hypot(dx, dy) || 1;
-      const ux = dx / len, uy = dy / len;
-
-      bullets.push({
-        x: player.x + ux*(player.r + r + 1),
-        y: player.y + uy*(player.r + r + 1),
-        vx: ux*speed,
-        vy: uy*speed,
-        r,
-        dmg,
-        life: player.bulletLife,
-      });
-    }
-
-    function shootScatter() {
-      const baseDmg = 1;
-      const dmg = baseDmg * game.dmgMult * (1 + game.buff_dmg);
-      const speed = player.bulletSpeed * (1 + game.buff_ballSpeed);
-      const r = player.bulletRadius * game.ballScale;
-
-      const n = 8;
-      for (let i=0;i<n;i++){
-        const a = (Math.PI*2)*(i/n);
-        const ux = Math.cos(a), uy = Math.sin(a);
-        bullets.push({
-          x: player.x + ux*(player.r + r + 1),
-          y: player.y + uy*(player.r + r + 1),
-          vx: ux*speed,
-          vy: uy*speed,
-          r,
-          dmg,
-          life: player.bulletLife,
-        });
-      }
-    }
-
-    function nearestEnemy() {
-      let best = null, bestD = Infinity;
-      for (const e of enemies) {
-        const d = dist2(e.x,e.y, player.x,player.y);
-        if (d < bestD) { bestD = d; best = e; }
-      }
-      if (game.boss) {
-        const d = dist2(game.boss.x,game.boss.y, player.x,player.y);
-        if (d < bestD) best = game.boss;
-      }
-      return best;
-    }
-
-    function enemyShoot(e) {
-      // simple projectile towards player
-      const dx = player.x - e.x;
-      const dy = player.y - e.y;
-      const len = Math.hypot(dx, dy) || 1;
-      const ux = dx/len, uy = dy/len;
-      const spd = 260;
-      enemyBullets.push({
-        x: e.x + ux*(e.r+6),
-        y: e.y + uy*(e.r+6),
-        vx: ux*spd,
-        vy: uy*spd,
-        r: 5,
-        life: 2.5,
-        dmg: 1
-      });
-    }
-
-    function bossShoot(b) {
-      // final boss shoots a fan; mini boss single shot
-      if (b.name.includes('大Boss')) {
-        const n = 5;
-        const baseA = Math.atan2(player.y - b.y, player.x - b.x);
-        for (let i=0;i<n;i++){
-          const a = baseA + (i-(n-1)/2)*0.18;
-          const ux = Math.cos(a), uy = Math.sin(a);
-          enemyBullets.push({
-            x: b.x + ux*(b.r+6),
-            y: b.y + uy*(b.r+6),
-            vx: ux*310,
-            vy: uy*310,
-            r: 6,
-            life: 2.8,
-            dmg: 1
-          });
-        }
-      } else {
-        enemyShoot(b);
-      }
-    }
-
-    // Drops / buffs
-    const DROP_TYPES = [
-      { key:'move', name:'移速+', apply:()=> game.buff_move += 0.10 },
-      { key:'dmg', name:'伤害+', apply:()=> game.buff_dmg += 0.20 },
-      { key:'rate', name:'射速+', apply:()=> game.buff_rate += 0.15 },
-      { key:'ball', name:'火球速+', apply:()=> game.buff_ballSpeed += 0.20 },
-      { key:'hp',   name:'血量+', apply:()=> { game.buff_hpMax += 1; player.hpMax += 1; player.hp = Math.min(player.hp+1, player.hpMax); } },
+    // spawn boss away from player
+    const p = state.player;
+    const corners = [
+      {x: 80, y: 80},
+      {x: W-80, y: 80},
+      {x: 80, y: H-80},
+      {x: W-80, y: H-80},
     ];
+    corners.sort((a,b) => dist2(b.x,b.y,p.x,p.y) - dist2(a.x,a.y,p.x,p.y));
+    const s = corners[0];
+    const boss = makeEnemy('boss', s.x, s.y, cfg);
+    boss.color = '#ffd66f';
+    state.enemies.push(boss);
+  }
 
-    function maybeDrop(x,y) {
-      // 22% drop chance, later stages slightly higher
-      const prog = (game.world-1)*5 + (game.stage-1);
-      const p = clamp(0.22 + prog*0.008, 0.22, 0.35);
-      if (Math.random() > p) return;
-      const t = DROP_TYPES[randi(0, DROP_TYPES.length-1)];
-      drops.push({
-        x, y, r: 10,
-        type: t,
-        ttl: 10 // seconds
-      });
-    }
+  function spawnFinalBoss() {
+    state.finalBoss = true;
+    state.bossAlive = true;
 
-    // ---------- Damage / Collisions ----------
-    function hurtPlayer(amount) {
-      if (player.invuln > 0) return;
-      player.hp -= amount;
-      player.invuln = 0.9; // seconds invuln
-      if (player.hp <= 0) {
-        if (game.reviveLeft > 0) {
-          game.reviveLeft -= 1;
-          // revive
-          player.hp = player.hpMax;
-          player.invuln = 1.5;
-          // small clear around
-          for (let i=enemies.length-1;i>=0;i--){
-            if (dist2(enemies[i].x,enemies[i].y, player.x,player.y) < 140*140) enemies.splice(i,1);
-          }
-          enemyBullets.length = 0;
-        } else {
-          endGame(false);
-        }
-      }
-    }
-
-    function killEnemyAt(index) {
-      const e = enemies[index];
-      // reward
-      game.totalKills += 1;
-      game.gold += 1;
-      game.score += 10;
-      maybeDrop(e.x, e.y);
-      enemies.splice(index,1);
-    }
-
-    function hitBoss(dmg) {
-      if (!game.boss) return;
-      game.boss.hp -= dmg;
-      if (game.boss.hp <= 0) {
-        // boss down
-        const wasFinal = game.boss.name.includes('大Boss');
-        game.score += wasFinal ? 2000 : 500;
-        game.gold += wasFinal ? 30 : 10;
-        game.boss = null;
-        if (wasFinal) {
-          endGame(true);
-        } else {
-          // proceed to next stage/world
-          advanceAfterBoss();
-        }
-      }
-    }
-
-    function advanceAfterBoss() {
-      // after stage 5 boss, go to next world or final boss
-      if (game.stage === 5) {
-        if (game.world < 3) {
-          game.world += 1;
-          game.stage = 1;
-          game.stageLeft = game.stageTime;
-          game.bossSpawned = false;
-          game.finalBoss = false;
-          applyStageParams();
-          // stage clear bonus
-          game.score += 200;
-        } else {
-          // all 3 worlds done -> final boss fight
-          game.finalBoss = true;
-          game.stageLeft = 999999; // no timer during final
-          game.bossSpawned = false;
-          enemies.length = 0;
-          enemyBullets.length = 0;
-          drops.length = 0;
-          spawnBoss('final');
-        }
-      }
-    }
-
-    function stageClearAdvance() {
-      // stage timer ends: if stage < 5 -> next stage, else spawn boss
-      if (game.stage < 5) {
-        game.stage += 1;
-        game.stageLeft = game.stageTime;
-        game.score += 200;
-        // mild heal reward
-        player.hp = Math.min(player.hp + 1, player.hpMax);
-        applyStageParams();
-      } else {
-        // stage 5 time ended => spawn mini boss if not spawned
-        if (!game.bossSpawned && !game.finalBoss) {
-          enemies.length = 0; enemyBullets.length = 0; drops.length = 0;
-          spawnBoss('mini');
-        }
-      }
-    }
-
-    // ---------- Shop / Leaderboard ----------
-    function openShop() {
-      const can100 = game.gold >= 100;
-      const can200 = game.gold >= 200;
-      const can300 = game.gold >= 300;
-      const can600 = game.gold >= 600;
-
-      const html = `
-        <h2>商店（金币：<b>${game.gold}</b>）</h2>
-        <div class="note">购买后是 <b>永久加成</b>（本局内一直生效）。按 <span class="kbd">Esc</span> 关闭。</div>
-        <div class="list" style="margin-top:12px">
-          <div class="item">
-            <div>
-              <b>100金币：伤害翻倍 x2</b><br/><small>可叠加（买一次就再翻倍）</small>
-            </div>
-            <button class="primary" ${can100 ? '' : 'disabled'} id="buy100">购买</button>
-          </div>
-          <div class="item">
-            <div>
-              <b>200金币：伤害翻倍 x2 + 火球大小翻倍</b><br/><small>伤害可叠加；火球大小可叠加</small>
-            </div>
-            <button class="primary" ${can200 ? '' : 'disabled'} id="buy200">购买</button>
-          </div>
-          <div class="item">
-            <div>
-              <b>300金币：四周发散火球（8方向散射）</b><br/><small>每次发射变成散射</small>
-            </div>
-            <button class="primary" ${can300 ? '' : 'disabled'} id="buy300">购买</button>
-          </div>
-          <div class="item">
-            <div>
-              <b>600金币：粉色小恐龙皮肤</b><br/><small>外观变化（不影响数值）</small>
-            </div>
-            <button class="primary" ${can600 ? '' : 'disabled'} id="buy600">购买</button>
-          </div>
-        </div>
-        <div class="row" style="margin-top:14px;justify-content:space-between">
-          <div class="note">快捷切换射击：<span class="kbd">1</span>单发 <span class="kbd">2</span>全自动 <span class="kbd">3</span>三连发</div>
-          <button id="closeShop">关闭</button>
-        </div>
-      `;
-      showOverlay(html);
-
-      const $ = (id) => document.getElementById(id);
-      $('closeShop').onclick = hideOverlay;
-
-      if ($('buy100')) $('buy100').onclick = () => {
-        if (game.gold < 100) return;
-        game.gold -= 100;
-        game.dmgMult *= 2;
-        hideOverlay();
-      };
-      if ($('buy200')) $('buy200').onclick = () => {
-        if (game.gold < 200) return;
-        game.gold -= 200;
-        game.dmgMult *= 2;
-        game.ballScale *= 2;
-        hideOverlay();
-      };
-      if ($('buy300')) $('buy300').onclick = () => {
-        if (game.gold < 300) return;
-        game.gold -= 300;
-        game.scatter = true;
-        hideOverlay();
-      };
-      if ($('buy600')) $('buy600').onclick = () => {
-        if (game.gold < 600) return;
-        game.gold -= 600;
-        player.skin = 'pink';
-        player.color = '#ff79c6';
-        hideOverlay();
-      };
-    }
-
-    function loadLB() {
-      try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); }
-      catch { return []; }
-    }
-    function saveLB(rows) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(rows.slice(0, 10)));
-    }
-    function renderLB(rows) {
-      if (!rows.length) return `<div class="note">暂无记录</div>`;
-      const items = rows.map((r,i)=>`
-        <div class="item">
-          <div><b>#${i+1} ${escapeHtml(r.name)}</b><br/>
-            <small>${r.date} · 击杀 ${r.kills} · 金币 ${r.gold} · 进度 ${r.progress}</small>
-          </div>
-          <div style="text-align:right"><b>${r.score}</b><br/><small>分数</small></div>
-        </div>
-      `).join('');
-      return `<div class="list">${items}</div>`;
-    }
-    function escapeHtml(s){
-      return (s||'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'","&#039;");
-    }
-
-    function endGame(win) {
-      running = false;
-      const rows = loadLB();
-      const progress = game.finalBoss ? 'Final' : stageLabel();
-      const title = win ? '通关成功！' : '游戏结束';
-      const note = win ? '你打赢了大Boss！' : '再来一把你一定更强。';
-      const html = `
-        <h2>${title}</h2>
-        <div class="twoCol">
-          <div class="panel" style="background:rgba(255,255,255,.05)">
-            <div class="row" style="justify-content:space-between">
-              <div>分数：<b>${game.score}</b></div>
-              <div>击杀：<b>${game.totalKills}</b></div>
-            </div>
-            <div class="row" style="justify-content:space-between;margin-top:6px">
-              <div>金币：<b>${game.gold}</b></div>
-              <div>进度：<b>${progress}</b></div>
-            </div>
-            <div class="note" style="margin-top:10px">${note}</div>
-            <div class="row" style="margin-top:12px">
-              <input id="playerName" type="text" maxlength="16" placeholder="输入名字上榜（可选）" />
-              <button class="primary" id="saveScore">保存</button>
-              <button id="restart">重开</button>
-            </div>
-            <div class="note" style="margin-top:10px">提示：按 <span class="kbd">Enter</span> 也可以直接重开。</div>
-          </div>
-          <div class="panel" style="background:rgba(255,255,255,.05)">
-            <b>排行榜 Top10</b>
-            <div style="margin-top:10px">${renderLB(rows)}</div>
-            <div class="row" style="margin-top:12px;justify-content:flex-end">
-              <button class="danger" id="clearLB">清空榜单</button>
-            </div>
-          </div>
-        </div>
-      `;
-      showOverlay(html);
-      const $ = (id) => document.getElementById(id);
-      $('restart').onclick = () => { hideOverlay(); resetGame(); };
-      $('saveScore').onclick = () => {
-        const name = ($('playerName').value || '').trim();
-        if (!name) return;
-        const entry = {
-          name,
-          score: game.score,
-          kills: game.totalKills,
-          gold: game.gold,
-          progress,
-          date: new Date().toLocaleString()
-        };
-        rows.push(entry);
-        rows.sort((a,b)=>b.score-a.score);
-        saveLB(rows);
-        // rerender
-        endGame(win); // re-open with refreshed list
-      };
-      $('clearLB').onclick = () => {
-        localStorage.removeItem(STORAGE_KEY);
-        endGame(win);
-      };
-    }
-
-    // ---------- Start / Reset ----------
-    function resetGame() {
-      // base
-      bullets.length = 0; enemies.length = 0; drops.length = 0; enemyBullets.length = 0;
-
-      game.world = 1;
-      game.stage = 1;
-      game.stageLeft = game.stageTime;
-      game.totalKills = 0;
-      game.score = 0;
-      game.gold = 0;
-
-      game.weaponMode = 'single';
-      game.scatter = false;
-      game.dmgMult = 1;
-      game.ballScale = 1;
-
-      game.buff_move = 0;
-      game.buff_dmg = 0;
-      game.buff_rate = 0;
-      game.buff_ballSpeed = 0;
-      game.buff_hpMax = 0;
-
-      game.reviveLeft = 1;
-
-      game.boss = null;
-      game.bossSpawned = false;
-      game.finalBoss = false;
-
-      player.x = W*0.5; player.y = H*0.5;
-      player.hpMax = 3;
-      player.hp = 3;
-      player.invuln = 1.0;
-      player.fireTimer = 0;
-      player.burstLeft = 0;
-      player.burstTimer = 0;
-      player.skin = 'default';
-      player.color = '#7cf';
-
-      applyStageParams();
-      syncUI();
-      running = true;
-    }
-
-    function startScreen() {
-      const rows = loadLB();
-      const html = `
-        <h2>🦖 恐龙大作战（网页版）</h2>
-        <div class="note">
-          规则：3大关×5小关（每小关3分钟）。每大关第5小关末尾有小Boss，三关结束后有大Boss。<br/>
-          初始血量3，敌人碰到扣1，可复活1次。后期敌人会远程攻击。<br/>
-          击杀敌人 +1金币，敌人可能掉落技能球（永久加成）。按 <span class="kbd">B</span> 打开商店。<br/>
-        </div>
-        <div class="row" style="margin-top:12px;gap:12px">
-          <button class="primary" id="startBtn">开始游戏（Enter）</button>
-          <button id="howBtn">操作说明</button>
-        </div>
-        <div class="panel" style="margin-top:14px;background:rgba(255,255,255,.05)">
-          <b>排行榜 Top10</b>
-          <div style="margin-top:10px">${renderLB(rows)}</div>
-        </div>
-      `;
-      showOverlay(html);
-      const $ = (id) => document.getElementById(id);
-      $('startBtn').onclick = () => { hideOverlay(); resetGame(); };
-      $('howBtn').onclick = () => {
-        showOverlay(`
-          <h2>操作说明</h2>
-          <div class="note">
-            移动：<span class="kbd">WASD</span> 或 <span class="kbd">↑↓←→</span><br/>
-            商店：<span class="kbd">B</span>（购买永久升级）<br/>
-            射击：默认自动吐火球（瞄准最近敌人）<br/>
-            切换射击模式：<span class="kbd">1</span> 单发 / <span class="kbd">2</span> 全自动 / <span class="kbd">3</span> 三连发<br/>
-            关闭窗口：<span class="kbd">Esc</span><br/>
-            开始/重开：<span class="kbd">Enter</span><br/>
-          </div>
-          <div class="row" style="margin-top:12px;justify-content:flex-end">
-            <button class="primary" id="back">返回</button>
-          </div>
-        `);
-        document.getElementById('back').onclick = () => startScreen();
-      };
-      running = false;
-    }
-
-    // ---------- Input ----------
-    window.addEventListener('keydown', (e) => {
-      if (e.repeat) return;
-      const k = e.key;
-      if (k === 'Escape') { if (overlayOpen) hideOverlay(); else openShop(); return; }
-      if (k === 'Enter') { if (!running) { hideOverlay(); resetGame(); } return; }
-
-      if (k === 'b' || k === 'B') {
-        if (running && !overlayOpen) openShop();
-        return;
-      }
-      if (k === '1') game.weaponMode = 'single';
-      if (k === '2') game.weaponMode = 'auto';
-      if (k === '3') game.weaponMode = 'burst';
-
-      keys.add(k);
+    const p = state.player;
+    const s = dist2(80,80,p.x,p.y) > dist2(W-80,H-80,p.x,p.y) ? {x:80,y:80} : {x:W-80,y:H-80};
+    const boss = makeEnemy('boss', s.x, s.y, {
+      bossRadius: FINAL_BOSS.radius,
+      bossHP: FINAL_BOSS.hp,
+      bossSpeed: FINAL_BOSS.speed,
+      bossRanged: true,
+      bossFireRate: FINAL_BOSS.fireRate,
+      bossBulletSpeed: FINAL_BOSS.bulletSpeed,
     });
-    window.addEventListener('keyup', (e) => keys.delete(e.key));
+    boss.color = '#ff9b6b';
+    boss.hpMax = FINAL_BOSS.hp;
+    boss.hp = FINAL_BOSS.hp;
+    boss.r = FINAL_BOSS.radius;
+    boss.speed = FINAL_BOSS.speed;
+    boss.ranged = true;
+    boss.fireRate = FINAL_BOSS.fireRate;
+    boss.bulletSpeed = FINAL_BOSS.bulletSpeed;
+    state.enemies.push(boss);
+  }
 
-    // ---------- Main Loop ----------
-    function tick(ts) {
-      if (!game.last) game.last = ts;
-      const dt = ts - game.last;
-      game.last = ts;
+  function enemyDrop(x, y) {
+    // drop chance
+    const r = Math.random();
+    if (r < 0.18) {
+      // skill drop
+      const pool = [
+        { type: 'skill', label: '移速+10%', apply: () => { state.buffs.speed += 10; } },
+        { type: 'skill', label: '伤害+20%', apply: () => { state.buffs.dmg += 20; } },
+        { type: 'skill', label: '射速+15%', apply: () => { state.buffs.fireRate += 15; } },
+        { type: 'skill', label: '火球速度+20%', apply: () => { state.buffs.projSpeed += 20; } },
+        { type: 'skill', label: '最大血量+1', apply: () => {
+          state.buffs.hpMax += 1;
+          state.player.hpMax = 3 + state.buffs.hpMax;
+          state.player.hp = Math.min(state.player.hp + 1, state.player.hpMax);
+        }},
+      ];
+      const pick = pool[Math.floor(Math.random()*pool.length)];
+      const d = makeDrop(x, y, 'skill', pick.label);
+      d.apply = pick.apply;
+      state.drops.push(d);
+    } else if (r < 0.32) {
+      // small heal orb (optional, but helpful)
+      const d = makeDrop(x, y, 'heal', '回血+1');
+      d.apply = () => {
+        state.player.hp = Math.min(state.player.hp + 1, state.player.hpMax);
+      };
+      state.drops.push(d);
+    }
+  }
 
-      if (running && !overlayOpen) {
-        // update timers
-        const dtSec = dt / 1000;
-        game.stageLeft -= dtSec;
+  // ===== Update & Draw =====
+  function update(dt) {
+    if (state.ended) return;
+    if (state.shopOpen) return;
 
-        if (!game.finalBoss) {
-          if (game.stageLeft <= 0) {
-            game.stageLeft = 0;
-            stageClearAdvance();
-          }
-        }
+    state.runTime += dt;
 
-        // movement
-        const spd = (player.speed * (1 + game.buff_move)) * dtSec;
-        let vx = 0, vy = 0;
-        const up = keys.has('w') || keys.has('W') || keys.has('ArrowUp');
-        const dn = keys.has('s') || keys.has('S') || keys.has('ArrowDown');
-        const lf = keys.has('a') || keys.has('A') || keys.has('ArrowLeft');
-        const rt = keys.has('d') || keys.has('D') || keys.has('ArrowRight');
-        if (up) vy -= 1;
-        if (dn) vy += 1;
-        if (lf) vx -= 1;
-        if (rt) vx += 1;
-        const l = Math.hypot(vx,vy) || 1;
-        if (vx || vy) { vx/=l; vy/=l; }
+    // stage timer
+    state.stageTimeLeft -= dt;
+    state.stageElapsed += dt;
 
-        player.x = clamp(player.x + vx*spd, player.r+4, W-player.r-4);
-        player.y = clamp(player.y + vy*spd, player.r+4, H-player.r-4);
+    // movement
+    const p = state.player;
+    const speedBuff = 1 + state.buffs.speed / 100;
+    let sp = p.speed * speedBuff;
 
-        // invuln
-        player.invuln = Math.max(0, player.invuln - dtSec);
+    let mx = 0, my = 0;
+    if (keys.has('w') || keys.has('arrowup')) my -= 1;
+    if (keys.has('s') || keys.has('arrowdown')) my += 1;
+    if (keys.has('a') || keys.has('arrowleft')) mx -= 1;
+    if (keys.has('d') || keys.has('arrowright')) mx += 1;
 
-        // spawn enemies (no spawn during boss arena if boss exists)
-        if (!game.boss && !game.finalBoss) {
-          game.spawnTimer += dt;
-          while (game.spawnTimer >= game.spawnInterval && enemies.length < game.enemyCap) {
-            game.spawnTimer -= game.spawnInterval;
-            spawnEnemy();
-          }
-        }
+    const len = Math.hypot(mx, my) || 1;
+    mx /= len; my /= len;
+    p.x = clamp(p.x + mx * sp * dt, p.r, W - p.r);
+    p.y = clamp(p.y + my * sp * dt, p.r, H - p.r);
 
-        // spawn mini boss at end of stage 5 when timer is low (if player kills fast and timer still running)
-        if (!game.finalBoss && game.stage === 5 && !game.bossSpawned && game.stageLeft <= 2) {
-          enemies.length = 0; enemyBullets.length = 0; drops.length = 0;
-          spawnBoss('mini');
-        }
+    // invuln timer
+    p.invuln = Math.max(0, p.invuln - dt);
 
-        // shooting (auto aim nearest enemy/boss)
-        const target = nearestEnemy();
-        const rateMult = (1 + game.buff_rate);
-        const baseInterval = player.fireInterval / rateMult;
-
-        // burst logic
-        player.burstTimer -= dt;
-        if (player.burstLeft > 0 && player.burstTimer <= 0) {
-          if (game.scatter) shootScatter();
-          else if (target) shootPlayer(target.x, target.y);
-          player.burstLeft--;
-          player.burstTimer = player.burstGap;
-        }
-
-        player.fireTimer += dt;
-        const wantShoot =
-          (game.weaponMode === 'auto') ? (target != null) :
-          (game.weaponMode === 'burst') ? (target != null) :
-          (game.weaponMode === 'single') ? (target != null) : false;
-
-        if (wantShoot && player.fireTimer >= baseInterval) {
-          player.fireTimer = 0;
-
-          if (game.weaponMode === 'burst') {
-            player.burstLeft = 3;
-            player.burstTimer = 0;
-          } else {
-            if (game.scatter) shootScatter();
-            else if (target) shootPlayer(target.x, target.y);
-          }
-        }
-
-        // update bullets
-        for (let i=bullets.length-1;i>=0;i--){
-          const b = bullets[i];
-          b.x += b.vx*dtSec;
-          b.y += b.vy*dtSec;
-          b.life -= dtSec;
-          if (b.life <= 0 || b.x<-50 || b.x>W+50 || b.y<-50 || b.y>H+50) {
-            bullets.splice(i,1);
-            continue;
-          }
-          // hit enemies
-          let hit = false;
-          for (let j=enemies.length-1;j>=0;j--){
-            const e = enemies[j];
-            const rr = (b.r + e.r);
-            if (dist2(b.x,b.y, e.x,e.y) <= rr*rr) {
-              e.hp -= b.dmg;
-              hit = true;
-              if (e.hp <= 0) killEnemyAt(j);
-              break;
-            }
-          }
-          // hit boss
-          if (!hit && game.boss) {
-            const rr = b.r + game.boss.r;
-            if (dist2(b.x,b.y, game.boss.x, game.boss.y) <= rr*rr) {
-              hit = true;
-              hitBoss(b.dmg);
-            }
-          }
-          if (hit) bullets.splice(i,1);
-        }
-
-        // update enemies
-        for (let i=enemies.length-1;i>=0;i--){
-          const e = enemies[i];
-          // move towards player
-          const dx = player.x - e.x, dy = player.y - e.y;
-          const len = Math.hypot(dx,dy) || 1;
-          const ux = dx/len, uy = dy/len;
-          e.x += ux*e.speed*dtSec;
-          e.y += uy*e.speed*dtSec;
-          e.x = clamp(e.x, e.r, W-e.r);
-          e.y = clamp(e.y, e.r, H-e.r);
-
-          // touch damage
-          if (dist2(e.x,e.y, player.x,player.y) <= (e.r+player.r)*(e.r+player.r)) {
-            hurtPlayer(1);
-          }
-
-          // ranged shooting
-          if (e.ranged) {
-            e.shootCD -= dtSec;
-            if (e.shootCD <= 0) {
-              e.shootCD = e.shootRate;
-              enemyShoot(e);
-            }
-          }
-        }
-
-        // boss behavior
-        if (game.boss) {
-          const b = game.boss;
-          // move towards player with slight offset
-          const dx = player.x - b.x, dy = player.y - b.y;
-          const len = Math.hypot(dx,dy) || 1;
-          const ux = dx/len, uy = dy/len;
-          b.x += ux*b.speed*dtSec;
-          b.y += uy*b.speed*dtSec;
-          b.x = clamp(b.x, b.r, W-b.r);
-          b.y = clamp(b.y, b.r, H-b.r);
-
-          // contact hurts
-          if (dist2(b.x,b.y, player.x,player.y) <= (b.r+player.r)*(b.r+player.r)) {
-            hurtPlayer(1);
-          }
-
-          // shoot
-          b.shootCD -= dtSec;
-          if (b.shootCD <= 0) {
-            b.shootCD = b.shootRate;
-            bossShoot(b);
-          }
-        }
-
-        // enemy bullets
-        for (let i=enemyBullets.length-1;i>=0;i--){
-          const b = enemyBullets[i];
-          b.x += b.vx*dtSec;
-          b.y += b.vy*dtSec;
-          b.life -= dtSec;
-          if (b.life <= 0 || b.x<-60 || b.x>W+60 || b.y<-60 || b.y>H+60) {
-            enemyBullets.splice(i,1);
-            continue;
-          }
-          const rr = b.r + player.r;
-          if (dist2(b.x,b.y, player.x,player.y) <= rr*rr) {
-            enemyBullets.splice(i,1);
-            hurtPlayer(b.dmg);
-          }
-        }
-
-        // drops
-        for (let i=drops.length-1;i>=0;i--){
-          const d = drops[i];
-          d.ttl -= dtSec;
-          if (d.ttl <= 0) { drops.splice(i,1); continue; }
-          if (dist2(d.x,d.y, player.x,player.y) <= (d.r+player.r)*(d.r+player.r)) {
-            // pick up
-            d.type.apply();
-            drops.splice(i,1);
-          }
-        }
-
-        // score small time bonus (optional, tiny)
-        game.score += dtSec * 0.2;
-
-        // clamp hp max updates
-        player.hpMax = clamp(player.hpMax, 3, 9);
-
-        syncUI();
-      }
-
-      draw();
-      requestAnimationFrame(tick);
+    // shooting (auto)
+    state.shootCd -= dt;
+    if (state.shootCd <= 0) {
+      shootAtNearest();
+      state.shootCd = currentFireInterval();
     }
 
-    // ---------- Drawing ----------
-    function drawCircle(x,y,r,color, alpha=1) {
-      ctx.globalAlpha = alpha;
+    // spawns
+    const cfg = stageConfig(state.world, state.stage);
+
+    // normal enemies spawn until boss stage end
+    state.spawnCd -= dt;
+    if (state.spawnCd <= 0) {
+      spawnEnemy();
+      state.spawnCd = cfg.spawnInterval;
+    }
+
+    // boss spawn near end of stage 5 (last 25s) or when time runs out
+    if (cfg.isBossStage) {
+      if (!state.bossAlive && state.stageTimeLeft <= 25) spawnStageBoss();
+    }
+
+    // when stage timer ends -> next stage/world, BUT boss must be defeated in stage 5
+    if (state.stageTimeLeft <= 0) {
+      if (cfg.isBossStage && state.enemies.some(e => e.isBoss && e.alive)) {
+        // force time to 0 but wait boss
+        state.stageTimeLeft = 0;
+      } else {
+        advanceStage();
+      }
+    }
+
+    // update enemies
+    for (const e of state.enemies) {
+      if (!e.alive) continue;
+
+      // chase player
+      const dx = p.x - e.x;
+      const dy = p.y - e.y;
+      const d = Math.hypot(dx, dy) || 1;
+      const ux = dx / d, uy = dy / d;
+      e.x = clamp(e.x + ux * e.speed * dt, e.r, W - e.r);
+      e.y = clamp(e.y + uy * e.speed * dt, e.r, H - e.r);
+
+      // ranged shoot
+      if (e.ranged) {
+        e.fireCd -= dt;
+        if (e.fireCd <= 0) {
+          fireEnemyBullet(e, p);
+          e.fireCd = e.fireRate;
+        }
+      }
+
+      // touch damage
+      if (dist2(p.x,p.y,e.x,e.y) <= (p.r + e.r) ** 2) {
+        if (p.invuln <= 0) {
+          damagePlayer(1);
+          p.invuln = 0.7; // invincibility
+        }
+      }
+
+      e.hitFlash = Math.max(0, e.hitFlash - dt);
+    }
+
+    // bullets
+    for (const b of state.bullets) {
+      if (!b.alive) continue;
+      b.x += b.vx * dt;
+      b.y += b.vy * dt;
+
+      // out of bounds
+      if (b.x < -50 || b.x > W + 50 || b.y < -50 || b.y > H + 50) {
+        b.alive = false;
+        continue;
+      }
+
+      if (b.from === 'player') {
+        // hit enemies
+        for (const e of state.enemies) {
+          if (!e.alive) continue;
+          if (dist2(b.x,b.y,e.x,e.y) <= (b.r + e.r) ** 2) {
+            e.hp -= b.dmg;
+            e.hitFlash = 0.08;
+            b.alive = false;
+            if (e.hp <= 0) {
+              killEnemy(e);
+            }
+            break;
+          }
+        }
+      } else {
+        // enemy bullet hit player
+        if (dist2(b.x,b.y,p.x,p.y) <= (b.r + p.r) ** 2) {
+          b.alive = false;
+          if (p.invuln <= 0) {
+            damagePlayer(1);
+            p.invuln = 0.55;
+          }
+        }
+      }
+    }
+
+    // drops
+    for (const d of state.drops) {
+      if (!d.alive) continue;
+      d.t += dt;
+
+      // pickup
+      if (dist2(d.x,d.y,p.x,p.y) <= (d.r + p.r) ** 2) {
+        d.alive = false;
+        if (typeof d.apply === 'function') d.apply();
+        if (state.shopOpen) updateShopUI();
+      }
+    }
+
+    // cleanup
+    state.enemies = state.enemies.filter(e => e.alive);
+    state.bullets = state.bullets.filter(b => b.alive);
+    state.drops = state.drops.filter(d => d.alive);
+
+    // If finished world3 stage5 boss and no enemies -> spawn final boss once
+    if (state.world === 3 && state.stage === 5) {
+      const cfg2 = stageConfig(3,5);
+      const bossStill = state.enemies.some(e => e.isBoss);
+      if (!bossStill && !state.finalBoss && state.stageTimeLeft <= 0) {
+        spawnFinalBoss();
+      }
+    }
+
+    // if final boss defeated -> win
+    if (state.finalBoss && !state.enemies.some(e => e.isBoss)) {
+      endGame(true);
+    }
+
+    updateHUD();
+  }
+
+  function advanceStage() {
+    // stage cleared
+    state.score += 200;
+    state.stageElapsed = 0;
+
+    if (state.stage < 5) {
+      state.stage++;
+      state.stageTimeLeft = 180;
+      state.spawnCd = 0.2;
+      state.bossAlive = false;
+    } else {
+      // world end
+      state.score += 500; // treat as boss/major progress bonus if boss already dead
+      if (state.world < 3) {
+        state.world++;
+        state.stage = 1;
+        state.stageTimeLeft = 180;
+        state.spawnCd = 0.2;
+        state.bossAlive = false;
+      } else {
+        // World 3 Stage 5 ended; if no final boss yet, keep timer 0 and wait/spawn final boss in update
+        state.stageTimeLeft = 0;
+      }
+    }
+  }
+
+  function shootAtNearest() {
+    const p = state.player;
+    const target = nearestEnemy(p.x, p.y);
+    if (!target) return;
+
+    const dx = target.x - p.x;
+    const dy = target.y - p.y;
+    const d = Math.hypot(dx, dy) || 1;
+    const ux = dx / d, uy = dy / d;
+
+    const sp = projectileSpeed();
+    const baseR = 6 * state.sizeMult;
+    const dmg = playerDamage();
+    if (!state.radial) {
+      state.bullets.push(makeBullet(p.x + ux*(p.r+6), p.y + uy*(p.r+6), ux*sp, uy*sp, baseR, dmg, 'player'));
+    } else {
+      // 8-direction radial
+      const dirs = [
+        [1,0],[0.707,0.707],[0,1],[-0.707,0.707],[-1,0],[-0.707,-0.707],[0,-1],[0.707,-0.707]
+      ];
+      for (const [vx, vy] of dirs) {
+        state.bullets.push(makeBullet(p.x, p.y, vx*sp, vy*sp, baseR*0.9, dmg*0.85, 'player'));
+      }
+    }
+  }
+
+  function fireEnemyBullet(e, p) {
+    const dx = p.x - e.x;
+    const dy = p.y - e.y;
+    const d = Math.hypot(dx, dy) || 1;
+    const ux = dx / d, uy = dy / d;
+    const sp = e.bulletSpeed || 260;
+    const r = e.isBoss ? 7 : 6;
+    state.bullets.push(makeBullet(e.x + ux*(e.r+4), e.y + uy*(e.r+4), ux*sp, uy*sp, r, 1, 'enemy'));
+  }
+
+  function nearestEnemy(x, y) {
+    let best = null;
+    let bestD = Infinity;
+    for (const e of state.enemies) {
+      if (!e.alive) continue;
+      const d = dist2(x, y, e.x, e.y);
+      if (d < bestD) { bestD = d; best = e; }
+    }
+    return best;
+  }
+
+  function killEnemy(e) {
+    e.alive = false;
+    state.kills += 1;
+    state.gold += 1;
+
+    // score
+    if (e.isBoss) {
+      state.score += state.finalBoss ? 2000 : 500;
+      // if boss cleared, allow stage to advance if timer already hit 0
+      if (stageConfig(state.world, state.stage).isBossStage && !state.finalBoss) {
+        // clear boss stage: if time <=0 then advance
+        if (state.stageTimeLeft <= 0) advanceStage();
+      }
+    } else {
+      state.score += 10;
+    }
+
+    enemyDrop(e.x, e.y);
+
+    // update shop display if open
+    if (state.shopOpen) updateShopUI();
+  }
+
+  function damagePlayer(amount) {
+    const p = state.player;
+    p.hp -= amount;
+    if (p.hp <= 0) {
+      if (p.reviveLeft > 0) {
+        p.reviveLeft -= 1;
+        p.hp = p.hpMax;
+        p.invuln = 1.2;
+      } else {
+        endGame(false);
+      }
+    }
+  }
+
+  function endGame(win) {
+    state.ended = true;
+    state.win = win;
+    closeShop();
+
+    endOverlay.style.display = 'flex';
+    endTitle.textContent = win ? '恭喜通关！' : '游戏结束';
+    endTag.textContent = win ? 'WIN' : 'LOSE';
+    endTag.className = 'tag ' + (win ? 'ok' : 'warn');
+
+    const p = state.player;
+    const w = `World ${state.world} / Stage ${state.stage}`;
+    endStats.innerHTML =
+      `进度：<b>${w}</b><br>` +
+      `击杀：<b>${state.kills}</b> ｜ 金币：<b>${state.gold}</b><br>` +
+      `分数：<b>${state.score}</b> ｜ 用时：<b>${Math.floor(state.runTime)}s</b><br>` +
+      `升级：DMG x${state.dmgMult} ｜ Size x${state.sizeMult} ｜ Radial: ${state.radial ? 'ON' : 'OFF'}<br>` +
+      `血量上限：<b>${p.hpMax}</b> ｜ 复活剩余：<b>${p.reviveLeft}</b>`;
+
+    saveHint.textContent = '';
+    boardCard.style.display = 'none';
+    nameInput.value = nameInput.value || 'Fang';
+  }
+
+  function restart() {
+    endOverlay.style.display = 'none';
+    shopOverlay.style.display = 'none';
+    resetState();
+    updateHUD();
+  }
+
+  function updateHUD() {
+    const p = state.player;
+    hudStage.textContent = `World ${state.world} / Stage ${state.stage}${state.finalBoss ? ' (Final Boss)' : ''}`;
+    hudTime.textContent = `Time: ${Math.max(0, Math.ceil(state.stageTimeLeft))}`;
+    hudHP.textContent = `HP: ${'❤'.repeat(p.hp)}${'·'.repeat(Math.max(0, p.hpMax - p.hp))}`;
+    hudRevive.textContent = `Revive: ${p.reviveLeft}`;
+    hudGold.textContent = `Gold: ${state.gold}`;
+    hudScore.textContent = `Score: ${state.score}`;
+    hudUpg.textContent = `DMG x${state.dmgMult} | Size x${state.sizeMult} | Radial: ${state.radial ? 'ON' : 'OFF'}`;
+  }
+
+  function draw() {
+    // clear
+    ctx.clearRect(0, 0, W, H);
+
+    // subtle grid dots
+    ctx.save();
+    ctx.globalAlpha = 0.08;
+    ctx.fillStyle = '#ffffff';
+    for (let y=18; y<H; y+=36) {
+      for (let x=18; x<W; x+=36) {
+        ctx.fillRect(x, y, 1, 1);
+      }
+    }
+    ctx.restore();
+
+    // drops
+    for (const d of state.drops) {
+      if (!d.alive) continue;
+      ctx.save();
+      ctx.translate(d.x, d.y);
+      const bob = Math.sin(d.t * 6) * 2.2;
+      ctx.translate(0, bob);
+
+      if (d.type === 'skill') {
+        ctx.fillStyle = 'rgba(99,143,255,.95)';
+      } else {
+        ctx.fillStyle = 'rgba(147,255,185,.95)';
+      }
       ctx.beginPath();
-      ctx.arc(x,y,r,0,Math.PI*2);
-      ctx.fillStyle = color;
+      ctx.arc(0, 0, d.r, 0, Math.PI*2);
       ctx.fill();
-      ctx.globalAlpha = 1;
+      ctx.globalAlpha = 0.95;
+      ctx.fillStyle = 'rgba(0,0,0,.55)';
+      ctx.beginPath();
+      ctx.arc(0, 0, d.r*0.58, 0, Math.PI*2);
+      ctx.fill();
+      ctx.restore();
     }
 
-    function draw() {
-      ctx.clearRect(0,0,W,H);
+    // bullets
+    for (const b of state.bullets) {
+      if (!b.alive) continue;
+      ctx.save();
+      ctx.fillStyle = (b.from === 'player') ? 'rgba(255,190,110,.95)' : 'rgba(140,208,255,.95)';
+      ctx.beginPath();
+      ctx.arc(b.x, b.y, b.r, 0, Math.PI*2);
+      ctx.fill();
+      ctx.restore();
+    }
 
-      // grid-ish stars
-      ctx.globalAlpha = 0.22;
-      ctx.fillStyle = '#ffffff';
-      for (let i=0;i<55;i++){
-        const x = (i*173 + Math.floor(game.last||0)) % W;
-        const y = (i*97 + 120) % H;
-        ctx.fillRect(x, y, 2, 2);
-      }
-      ctx.globalAlpha = 1;
+    // enemies
+    for (const e of state.enemies) {
+      if (!e.alive) continue;
+      ctx.save();
+      ctx.fillStyle = e.hitFlash > 0 ? 'rgba(255,255,255,.95)' : e.color;
+      ctx.beginPath();
+      ctx.arc(e.x, e.y, e.r, 0, Math.PI*2);
+      ctx.fill();
 
-      // drops
-      for (const d of drops) {
-        drawCircle(d.x,d.y,d.r, '#7cffc6', 0.9);
-        ctx.font = '12px system-ui';
-        ctx.fillStyle = 'rgba(255,255,255,.9)';
-        ctx.textAlign = 'center';
-        ctx.fillText(d.type.name, d.x, d.y - 14);
-      }
+      // small eyes
+      ctx.globalAlpha = 0.9;
+      ctx.fillStyle = 'rgba(0,0,0,.55)';
+      ctx.beginPath();
+      ctx.arc(e.x - e.r*0.25, e.y - e.r*0.18, Math.max(2, e.r*0.12), 0, Math.PI*2);
+      ctx.arc(e.x + e.r*0.25, e.y - e.r*0.18, Math.max(2, e.r*0.12), 0, Math.PI*2);
+      ctx.fill();
 
-      // bullets
-      for (const b of bullets) {
-        drawCircle(b.x,b.y,b.r,'#ff8b5c', 0.95);
-      }
+      // hp bar for boss
+      if (e.isBoss) {
+        const barW = 160, barH = 10;
+        const x = W/2 - barW/2;
+        const y = 18 + 44;
+        const t = clamp(e.hp / e.hpMax, 0, 1);
 
-      // enemy bullets
-      for (const b of enemyBullets) {
-        drawCircle(b.x,b.y,b.r,'#ffd166', 0.9);
-      }
-
-      // enemies
-      for (const e of enemies) {
-        drawCircle(e.x,e.y,e.r, e.color, 0.95);
-        // tiny hp bar
-        const pct = e.hp / e.hpMax;
-        ctx.globalAlpha = 0.8;
-        ctx.fillStyle = 'rgba(0,0,0,.35)';
-        ctx.fillRect(e.x - e.r, e.y - e.r - 10, e.r*2, 4);
-        ctx.fillStyle = '#aef';
-        ctx.fillRect(e.x - e.r, e.y - e.r - 10, e.r*2*pct, 4);
         ctx.globalAlpha = 1;
+        ctx.fillStyle = 'rgba(0,0,0,.35)';
+        roundRect(ctx, x, y, barW, barH, 8, true, false);
+        ctx.fillStyle = 'rgba(255,255,255,.18)';
+        roundRect(ctx, x, y, barW, barH, 8, false, true);
+
+        ctx.fillStyle = 'rgba(255,135,110,.85)';
+        roundRect(ctx, x, y, barW * t, barH, 8, true, false);
+
+        ctx.fillStyle = 'rgba(255,255,255,.85)';
+        ctx.font = '12px system-ui';
+        ctx.fillText(state.finalBoss ? '大Boss' : '小Boss', x, y - 6);
       }
 
-      // boss
-      if (game.boss) {
-        const b = game.boss;
-        drawCircle(b.x,b.y,b.r, b.color, 0.95);
-        ctx.font = '14px system-ui';
-        ctx.fillStyle = 'rgba(255,255,255,.9)';
-        ctx.textAlign = 'center';
-        ctx.fillText('BOSS', b.x, b.y + 5);
-      }
+      ctx.restore();
+    }
 
-      // player
-      const blink = player.invuln > 0 ? (Math.sin((game.last||0)/80)*0.5+0.5) : 1;
-      drawCircle(player.x,player.y,player.r, player.color, player.invuln>0 ? 0.45+0.55*blink : 1);
-      // tiny face dot
-      drawCircle(player.x + 6, player.y -
+    // player
+    const p = state.player;
+    ctx.save();
+    ctx.globalAlpha = (p.invuln > 0) ? 0.65 : 1;
+    ctx.fillStyle = p.color;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.r, 0, Math.PI*2);
+    ctx.fill();
+
+    // little mouth flame hint
+    ctx.globalAlpha = 0.9;
+    ctx.fillStyle = 'rgba(255,190,110,.85)';
+    ctx.beginPath();
+    ctx.arc(p.x + p.r*0.6, p.y, 4, 0, Math.PI*2);
+    ctx.fill();
+
+    // outline
+    ctx.globalAlpha = 0.35;
+    ctx.strokeStyle = 'rgba(255,255,255,.55)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.r, 0, Math.PI*2);
+    ctx.stroke();
+
+    ctx.restore();
+
+    // stage text
+    ctx.save();
+    ctx.globalAlpha = 0.9;
+    ctx.fillStyle = 'rgba(255,255,255,.88)';
+    ctx.font = '14px system-ui';
+    const cfg = stageConfig(state.world, state.stage);
+    let tip = `敌人上限 ${Math.floor(cfg.maxEnemies)} | 刷怪间隔 ${cfg.spawnInterval.toFixed(2)}s`;
+    if (cfg.rangedChance > 0) tip += ` | 远程怪概率 ${(cfg.rangedChance*100).toFixed(0)}%`;
+    if (cfg.isBossStage) tip += ` | 小Boss：倒计时≤25秒出现`;
+    if (state.finalBoss) tip = '最终战：大Boss！';
+    ctx.fillText(tip, 16, H - 16);
+    ctx.restore();
+  }
+
+  function roundRect(ctx, x, y, w, h, r, fill, stroke) {
+    const rr = Math.min(r, w/2, h/2);
+    ctx.beginPath();
+    ctx.moveTo(x+rr, y);
+    ctx.arcTo(x+w, y, x+w, y+h, rr);
+    ctx.arcTo(x+w, y+h, x, y+h, rr);
+    ctx.arcTo(x, y+h, x, y, rr);
+    ctx.arcTo(x, y, x+w, y, rr);
+    ctx.closePath();
+    if (fill) ctx.fill();
+    if (stroke) ctx.stroke();
+  }
+
+  // ===== Loop =====
+  let last = performance.now();
+  function frame(now) {
+    const dt = Math.min(0.033, (now - last) / 1000);
+    last = now;
+
+    update(dt);
+    draw();
+
+    requestAnimationFrame(frame);
+  }
+  updateHUD();
+  requestAnimationFrame(frame);
+
+  // ===== Shop key states: show "can't buy" hints =====
+  function canBuy(cost) { return state.gold >= cost; }
+
+  // ===== end overlay hotkeys =====
+  window.addEventListener('keydown', (e) => {
+    if (!state.ended) return;
+    if (e.key === 'Enter') saveScore();
+  });
+
+})();
+</script>
+</body>
+</html>

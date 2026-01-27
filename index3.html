@@ -1,0 +1,784 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Aim Trainer (Random Targets + Leaderboard)</title>
+  <style>
+    :root { color-scheme: dark; }
+    body{
+      margin:0;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, "Noto Sans", "PingFang SC", "Microsoft YaHei", sans-serif;
+      background:#0b0f14;
+      color:#e8eef6;
+      display:flex;
+      justify-content:center;
+      min-height:100vh;
+    }
+    .wrap{ width:min(1020px, 96vw); padding:18px 10px 28px; }
+    .top{
+      display:flex; gap:12px; justify-content:space-between; align-items:flex-end; flex-wrap:wrap;
+      margin-bottom:10px;
+    }
+    .title{ font-size:20px; font-weight:800; letter-spacing:0.2px; }
+    .sub{ font-size:13px; color:#a9b4c2; line-height:1.35; margin-top:4px; }
+    .panel{
+      display:flex; gap:10px; align-items:center; flex-wrap:wrap;
+      background:#0f1722;
+      border:1px solid rgba(255,255,255,0.08);
+      border-radius:14px;
+      padding:10px;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.35);
+    }
+    .stat{
+      padding:6px 10px;
+      border-radius:12px;
+      background:rgba(255,255,255,0.04);
+      border:1px solid rgba(255,255,255,0.08);
+      font-size:13px;
+      white-space:nowrap;
+    }
+    .stat b{ font-size:14px; }
+    .btn{
+      background:#1b2a3d;
+      color:#e8eef6;
+      border:1px solid rgba(255,255,255,0.12);
+      padding:8px 12px;
+      border-radius:12px;
+      cursor:pointer;
+      font-weight:650;
+    }
+    .btn:disabled{ opacity:0.55; cursor:not-allowed; }
+    .row{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+    .control{
+      display:flex; gap:8px; align-items:center;
+      padding:6px 10px;
+      border-radius:12px;
+      background:rgba(255,255,255,0.04);
+      border:1px solid rgba(255,255,255,0.08);
+      font-size:13px;
+      white-space:nowrap;
+    }
+    input[type="range"]{ width:150px; }
+    input[type="text"]{
+      background: rgba(255,255,255,0.05);
+      border:1px solid rgba(255,255,255,0.14);
+      color:#e8eef6;
+      padding:8px 10px;
+      border-radius:12px;
+      outline:none;
+      width: 140px;
+    }
+    select{
+      background: rgba(255,255,255,0.05);
+      border:1px solid rgba(255,255,255,0.14);
+      color:#e8eef6;
+      padding:8px 10px;
+      border-radius:12px;
+      outline:none;
+    }
+    canvas{
+      width:100%;
+      height:auto;
+      border-radius:16px;
+      background:#0f1722;
+      border:1px solid rgba(255,255,255,0.08);
+      box-shadow: 0 16px 60px rgba(0,0,0,0.45);
+      user-select:none;
+      touch-action: none;
+      display:block;
+    }
+    .grid{
+      display:grid;
+      grid-template-columns: 1fr 320px;
+      gap:12px;
+      align-items:start;
+    }
+    @media (max-width: 980px){
+      .grid{ grid-template-columns: 1fr; }
+    }
+    .side{
+      background:#0f1722;
+      border:1px solid rgba(255,255,255,0.08);
+      border-radius:16px;
+      box-shadow: 0 16px 60px rgba(0,0,0,0.25);
+      padding:12px;
+    }
+    .side h3{
+      margin:0 0 10px;
+      font-size:15px;
+      color:#dbe7ff;
+    }
+    .lb{
+      width:100%;
+      border-collapse: collapse;
+      font-size:13px;
+      color:#cfe0ff;
+    }
+    .lb th, .lb td{
+      padding:8px 6px;
+      border-bottom:1px solid rgba(255,255,255,0.08);
+      text-align:left;
+    }
+    .muted{ color:#a9b4c2; font-size:12px; line-height:1.35; }
+    .kbd{
+      padding:2px 6px;
+      border:1px solid rgba(255,255,255,0.14);
+      border-bottom-width:2px;
+      border-radius:8px;
+      background:rgba(255,255,255,0.05);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size:12px;
+      color:#dbe7ff;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="top">
+      <div>
+        <div class="title">🎯 Aim Trainer：随机靶（排行 + 点射/三连发/全自动）</div>
+        <div class="sub">
+          靶子会随机出现在任意位置，时间越久：出现更快、靶更小、存活更短。<br/>
+          枪械模式：Semi=点一下打一发；Burst=点一下3连发；Auto=按住连续射击。
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="row">
+          <button id="startBtn" class="btn">Start</button>
+          <button id="pauseBtn" class="btn" disabled>Pause</button>
+          <button id="resetBtn" class="btn">Reset</button>
+        </div>
+
+        <div class="row">
+          <div class="stat">Time: <b id="time">30.0</b>s</div>
+          <div class="stat">Score: <b id="score">0</b></div>
+          <div class="stat">Hits: <b id="hits">0</b></div>
+          <div class="stat">Miss: <b id="miss">0</b></div>
+          <div class="stat">Acc: <b id="acc">0</b>%</div>
+          <div class="stat">Combo: <b id="combo">0</b></div>
+          <div class="stat">RPM: <b id="rpm">0</b></div>
+        </div>
+
+        <div class="row">
+          <div class="control">
+            Name
+            <input id="name" type="text" maxlength="12" placeholder="Fang" />
+          </div>
+
+          <div class="control">
+            Mode
+            <select id="mode">
+              <option value="semi">Semi (点射)</option>
+              <option value="burst">Burst (3连发)</option>
+              <option value="auto">Auto (全自动)</option>
+            </select>
+          </div>
+
+          <div class="control">
+            Duration
+            <input id="dur" type="range" min="15" max="90" step="5" value="30">
+            <span id="durVal">30s</span>
+          </div>
+
+          <div class="control">
+            FireRate
+            <input id="rof" type="range" min="60" max="900" step="30" value="360">
+            <span id="rofVal">360rpm</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid">
+      <canvas id="c" width="980" height="560"></canvas>
+
+      <div class="side">
+        <h3>🏆 Leaderboard (Top 10)</h3>
+        <table class="lb" id="lbTable">
+          <thead>
+            <tr><th>#</th><th>Name</th><th>Score</th><th>Acc</th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+
+        <div style="display:flex; gap:8px; margin-top:10px; flex-wrap:wrap;">
+          <button id="clearLbBtn" class="btn">Clear Leaderboard</button>
+        </div>
+
+        <p class="muted" style="margin-top:10px;">
+          保存位置：你的浏览器本地（localStorage），换电脑/换浏览器不会同步。<br/>
+          快捷键：<span class="kbd">Space</span> 暂停/继续｜
+          <span class="kbd">R</span> 重置｜
+          <span class="kbd">1</span>/<span class="kbd">2</span>/<span class="kbd">3</span> 切换枪械模式
+        </p>
+      </div>
+    </div>
+
+    <div class="muted" id="status" style="margin-top:10px;">Status: Ready</div>
+  </div>
+
+<script>
+(() => {
+  const canvas = document.getElementById("c");
+  const ctx = canvas.getContext("2d");
+
+  const startBtn = document.getElementById("startBtn");
+  const pauseBtn = document.getElementById("pauseBtn");
+  const resetBtn = document.getElementById("resetBtn");
+
+  const timeEl = document.getElementById("time");
+  const scoreEl = document.getElementById("score");
+  const hitsEl = document.getElementById("hits");
+  const missEl = document.getElementById("miss");
+  const accEl = document.getElementById("acc");
+  const comboEl = document.getElementById("combo");
+  const rpmEl = document.getElementById("rpm");
+  const statusEl = document.getElementById("status");
+
+  const nameInput = document.getElementById("name");
+  const modeSel = document.getElementById("mode");
+  const durSlider = document.getElementById("dur");
+  const durVal = document.getElementById("durVal");
+  const rofSlider = document.getElementById("rof");
+  const rofVal = document.getElementById("rofVal");
+
+  const lbTableBody = document.querySelector("#lbTable tbody");
+  const clearLbBtn = document.getElementById("clearLbBtn");
+
+  const W = canvas.width, H = canvas.height;
+
+  // ------------------ Leaderboard (localStorage) ------------------
+  const LB_KEY = "aim_trainer_lb_v1";
+  function loadLB(){
+    try{
+      const raw = localStorage.getItem(LB_KEY);
+      if(!raw) return [];
+      const arr = JSON.parse(raw);
+      if(!Array.isArray(arr)) return [];
+      return arr.slice(0, 10);
+    }catch{
+      return [];
+    }
+  }
+  function saveLB(arr){
+    localStorage.setItem(LB_KEY, JSON.stringify(arr.slice(0, 10)));
+  }
+  function renderLB(){
+    const lb = loadLB();
+    lbTableBody.innerHTML = "";
+    lb.forEach((r, i) => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `<td>${i+1}</td><td>${escapeHtml(r.name)}</td><td>${r.score}</td><td>${r.acc}%</td>`;
+      lbTableBody.appendChild(tr);
+    });
+    if(lb.length === 0){
+      const tr = document.createElement("tr");
+      tr.innerHTML = `<td colspan="4" style="color:#a9b4c2;">No records yet.</td>`;
+      lbTableBody.appendChild(tr);
+    }
+  }
+  function pushLB(record){
+    const lb = loadLB();
+    lb.push(record);
+    lb.sort((a,b) => b.score - a.score);
+    saveLB(lb);
+    renderLB();
+  }
+  function escapeHtml(s){
+    return String(s).replace(/[&<>"']/g, c => ({
+      "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"
+    }[c]));
+  }
+
+  // ------------------ Game state ------------------
+  let running = false;
+  let paused = false;
+
+  let duration = Number(durSlider.value);
+  let tLeft = duration;
+
+  let score = 0;
+  let hits = 0;
+  let miss = 0;
+  let combo = 0;
+
+  let startAt = 0;
+  let lastFrame = 0;
+
+  // target lifecycle
+  let target = null;          // only 1 target at a time (clean aim trainer feel)
+  let nextSpawnAt = 0;
+
+  // gun
+  let gunMode = modeSel.value;  // semi | burst | auto
+  let rpm = Number(rofSlider.value); // rounds per minute
+  let msPerShot = 60000 / rpm;
+
+  // firing loop
+  let mouse = {x: W/2, y: H/2, down:false};
+  let canShootAt = 0;
+  let burstLeft = 0;
+
+  // stats for RPM display
+  let shotsWindow = []; // timestamps of recent shots
+
+  function rand(a,b){ return a + Math.random()*(b-a); }
+  function clamp(v,a,b){ return Math.max(a, Math.min(b, v)); }
+
+  function syncControls(){
+    duration = Number(durSlider.value);
+    durVal.textContent = `${durSlider.value}s`;
+
+    rpm = Number(rofSlider.value);
+    rofVal.textContent = `${rofSlider.value}rpm`;
+    msPerShot = 60000 / rpm;
+
+    gunMode = modeSel.value;
+  }
+
+  function updateUI(){
+    timeEl.textContent = tLeft.toFixed(1);
+    scoreEl.textContent = String(score);
+    hitsEl.textContent = String(hits);
+    missEl.textContent = String(miss);
+    comboEl.textContent = String(combo);
+
+    const totalShots = hits + miss;
+    const acc = totalShots === 0 ? 0 : (hits / totalShots) * 100;
+    accEl.textContent = acc.toFixed(0);
+
+    // RPM display from last 2 seconds
+    const now = performance.now();
+    shotsWindow = shotsWindow.filter(t => now - t <= 2000);
+    const spm = shotsWindow.length / 2 * 60; // shots per minute approx
+    rpmEl.textContent = spm.toFixed(0);
+  }
+
+  function resetGame(){
+    running = false;
+    paused = false;
+    syncControls();
+
+    tLeft = duration;
+    score = 0; hits = 0; miss = 0; combo = 0;
+
+    target = null;
+    nextSpawnAt = 0;
+
+    burstLeft = 0;
+    mouse.down = false;
+    canShootAt = 0;
+    shotsWindow = [];
+
+    startBtn.disabled = false;
+    pauseBtn.disabled = true;
+    pauseBtn.textContent = "Pause";
+
+    statusEl.textContent = "Status: Ready";
+    updateUI();
+    draw();
+  }
+
+  // Difficulty ramps by elapsed fraction p (0..1)
+  function diff(elapsedSec){
+    const p = clamp(elapsedSec / duration, 0, 1);
+    const spawnGapMs = 700 * (1 - 0.55*p) + 120; // time between targets shrinks
+    const lifeMs = (1100 * (1 - 0.55*p) + 380);  // target stays less time
+    const r = (28 * (1 - 0.45*p) + 10);          // target gets smaller
+    return {p, spawnGapMs, lifeMs, r};
+  }
+
+  function newTarget(elapsedSec){
+    const d = diff(elapsedSec);
+    const r = d.r * rand(0.85, 1.15);
+
+    // keep away from edges and HUD top area a bit
+    const margin = 40 + r;
+    const topPad = 75;
+    const x = rand(margin, W - margin);
+    const y = rand(margin + topPad, H - margin);
+
+    // scoring: smaller target = more points
+    const value = Math.round(10 + (26 / r) * 8);
+
+    target = {
+      x, y, r,
+      born: performance.now(),
+      lifeMs: d.lifeMs,
+      value
+    };
+
+    nextSpawnAt = performance.now() + d.spawnGapMs;
+  }
+
+  function startGame(){
+    syncControls();
+    tLeft = duration;
+    score = 0; hits = 0; miss = 0; combo = 0;
+    shotsWindow = [];
+
+    running = true;
+    paused = false;
+
+    startAt = performance.now();
+    lastFrame = startAt;
+
+    target = null;
+    nextSpawnAt = startAt;
+
+    startBtn.disabled = true;
+    pauseBtn.disabled = false;
+    pauseBtn.textContent = "Pause";
+
+    statusEl.textContent = "Status: Running";
+    requestAnimationFrame(loop);
+  }
+
+  function endGame(){
+    running = false;
+    paused = false;
+    pauseBtn.disabled = true;
+    startBtn.disabled = false;
+
+    // compute final acc
+    const totalShots = hits + miss;
+    const acc = totalShots === 0 ? 0 : (hits / totalShots) * 100;
+
+    statusEl.textContent = `Status: Finished — Score ${score}, Acc ${acc.toFixed(0)}%`;
+
+    // leaderboard save
+    const name = (nameInput.value || "Player").trim().slice(0, 12) || "Player";
+    pushLB({
+      name,
+      score,
+      acc: acc.toFixed(0),
+      ts: Date.now()
+    });
+  }
+
+  function togglePause(){
+    if(!running) return;
+    paused = !paused;
+    pauseBtn.textContent = paused ? "Resume" : "Pause";
+    statusEl.textContent = paused ? "Status: Paused" : "Status: Running";
+
+    if(!paused){
+      const now = performance.now();
+      lastFrame = now;
+
+      // prevent target from instantly expiring due to pause time
+      if(target){
+        const pausedFor = now - pauseStartAt;
+        target.born += pausedFor;
+      }
+      nextSpawnAt += (now - pauseStartAt);
+
+      requestAnimationFrame(loop);
+    }else{
+      pauseStartAt = performance.now();
+    }
+  }
+  let pauseStartAt = 0;
+
+  // ------------------ Shooting mechanics ------------------
+  function registerShot(){
+    shotsWindow.push(performance.now());
+  }
+
+  function attemptShoot(x, y){
+    if(!running || paused) return;
+    const now = performance.now();
+    if(now < canShootAt) return; // fire rate limit
+
+    canShootAt = now + msPerShot;
+    registerShot();
+
+    // hit test
+    if(target){
+      const d = Math.hypot(x - target.x, y - target.y);
+      if(d <= target.r){
+        hits += 1;
+        combo += 1;
+
+        // center bonus: closer to center = more bonus
+        const centerFactor = 1 - (d / target.r); // 0..1
+        const bonus = Math.floor(centerFactor * 6) + Math.floor(Math.min(25, combo) * 0.5);
+
+        score += (target.value + bonus);
+
+        // remove target immediately on hit
+        target = null;
+
+        updateUI();
+        return;
+      }
+    }
+
+    // miss
+    miss += 1;
+    combo = 0;
+    score = Math.max(0, score - 1);
+    updateUI();
+  }
+
+  function fireOnce(){
+    attemptShoot(mouse.x, mouse.y);
+  }
+
+  function handleMouseDown(){
+    mouse.down = true;
+    if(!running || paused) return;
+
+    if(gunMode === "semi"){
+      fireOnce();
+    }else if(gunMode === "burst"){
+      // schedule 3 shots governed by fire rate
+      burstLeft = 3;
+    }else if(gunMode === "auto"){
+      // continuous in loop
+      fireOnce(); // immediate first shot feels better
+    }
+  }
+  function handleMouseUp(){
+    mouse.down = false;
+    burstLeft = 0; // stop burst if release (you can comment this out if you want burst to always finish)
+  }
+
+  // ------------------ Update + Draw ------------------
+  function update(dtSec, elapsedSec){
+    tLeft = Math.max(0, duration - elapsedSec);
+
+    const now = performance.now();
+
+    // spawn target if needed
+    if(!target && now >= nextSpawnAt){
+      newTarget(elapsedSec);
+    }
+
+    // expire target
+    if(target){
+      if(now - target.born >= target.lifeMs){
+        // target disappeared -> count as miss
+        target = null;
+        miss += 1;
+        combo = 0;
+        updateUI();
+      }
+    }
+
+    // gun behavior in update loop:
+    // auto: keep firing while mouse down
+    // burst: fire remaining shots while mouse down (or until burstLeft=0)
+    if(mouse.down && running && !paused){
+      if(gunMode === "auto"){
+        fireOnce();
+      }else if(gunMode === "burst" && burstLeft > 0){
+        // try to fire; only decrements if a shot actually happens (fire rate allows)
+        const beforeHits = hits, beforeMiss = miss;
+        const beforeCan = canShootAt;
+        fireOnce();
+        const shotHappened = (performance.now() > beforeCan); // approximate
+        // better check: if canShootAt moved forward, then a shot fired
+        if(canShootAt !== beforeCan){
+          burstLeft -= 1;
+        }
+      }
+    }
+
+    if(tLeft <= 0){
+      endGame();
+    }
+  }
+
+  function draw(){
+    ctx.clearRect(0,0,W,H);
+
+    // background
+    ctx.fillStyle = "#0b0f14";
+    ctx.fillRect(0,0,W,H);
+
+    // arena
+    ctx.fillStyle = "#0f1722";
+    ctx.fillRect(18, 18, W-36, H-36);
+
+    ctx.strokeStyle = "rgba(255,255,255,0.10)";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(18, 18, W-36, H-36);
+
+    // info inside canvas
+    ctx.fillStyle = "rgba(255,255,255,0.85)";
+    ctx.font = "16px system-ui, sans-serif";
+    ctx.fillText("Click targets. Mode: Semi / Burst / Auto. Difficulty ramps up.", 28, 42);
+
+    // progress bar (difficulty)
+    const elapsed = running ? clamp((performance.now()-startAt)/1000, 0, duration) : 0;
+    const p = duration > 0 ? elapsed/duration : 0;
+    ctx.fillStyle = "rgba(255,255,255,0.12)";
+    ctx.fillRect(28, 54, W-56, 8);
+    ctx.fillStyle = "rgba(255,255,255,0.55)";
+    ctx.fillRect(28, 54, (W-56)*p, 8);
+
+    // target
+    if(target){
+      // subtle pulse based on lifetime
+      const now = performance.now();
+      const lifeP = 1 - clamp((now - target.born) / target.lifeMs, 0, 1);
+      const pulse = 1 + Math.sin(now/120) * 0.03;
+
+      // glow
+      ctx.beginPath();
+      ctx.arc(target.x, target.y, target.r*1.4*pulse, 0, Math.PI*2);
+      ctx.fillStyle = `rgba(88,166,255,${0.08 + 0.10*lifeP})`;
+      ctx.fill();
+
+      // body
+      ctx.beginPath();
+      ctx.arc(target.x, target.y, target.r*pulse, 0, Math.PI*2);
+      ctx.fillStyle = "rgba(88,166,255,0.88)";
+      ctx.fill();
+
+      // inner dot
+      ctx.beginPath();
+      ctx.arc(target.x, target.y, Math.max(3, target.r*0.20), 0, Math.PI*2);
+      ctx.fillStyle = "rgba(255,255,255,0.75)";
+      ctx.fill();
+    }
+
+    // crosshair
+    ctx.save();
+    ctx.translate(mouse.x, mouse.y);
+    ctx.strokeStyle = "rgba(255,255,255,0.65)";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(-12, 0); ctx.lineTo(-4, 0);
+    ctx.moveTo(4, 0); ctx.lineTo(12, 0);
+    ctx.moveTo(0, -12); ctx.lineTo(0, -4);
+    ctx.moveTo(0, 4); ctx.lineTo(0, 12);
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.arc(0,0, 16, 0, Math.PI*2);
+    ctx.strokeStyle = "rgba(255,255,255,0.25)";
+    ctx.stroke();
+    ctx.restore();
+
+    // overlay
+    if(!running){
+      ctx.fillStyle = "rgba(0,0,0,0.35)";
+      ctx.fillRect(18,18,W-36,H-36);
+      ctx.fillStyle = "rgba(255,255,255,0.92)";
+      ctx.font = "700 28px system-ui, sans-serif";
+      ctx.fillText("Aim Trainer", 60, H/2 - 10);
+      ctx.font = "14px system-ui, sans-serif";
+      ctx.fillStyle = "rgba(255,255,255,0.75)";
+      ctx.fillText("Press Start to begin. (1/2/3 to switch modes)", 60, H/2 + 18);
+    }
+
+    if(running && paused){
+      ctx.fillStyle = "rgba(0,0,0,0.45)";
+      ctx.fillRect(18,18,W-36,H-36);
+      ctx.fillStyle = "rgba(255,255,255,0.92)";
+      ctx.font = "700 30px system-ui, sans-serif";
+      ctx.fillText("Paused", 60, H/2);
+      ctx.font = "14px system-ui, sans-serif";
+      ctx.fillStyle = "rgba(255,255,255,0.75)";
+      ctx.fillText("Press Space or click Resume.", 60, H/2 + 24);
+    }
+  }
+
+  function loop(now){
+    if(!running || paused){ draw(); return; }
+
+    const dt = Math.min(40, now - lastFrame); // ms
+    lastFrame = now;
+
+    const elapsedSec = (now - startAt) / 1000;
+    update(dt/1000, elapsedSec);
+    updateUI();
+    draw();
+
+    if(running && !paused) requestAnimationFrame(loop);
+  }
+
+  // ------------------ Input ------------------
+  function canvasPos(e){
+    const rect = canvas.getBoundingClientRect();
+    const sx = canvas.width / rect.width;
+    const sy = canvas.height / rect.height;
+    return {
+      x: (e.clientX - rect.left) * sx,
+      y: (e.clientY - rect.top) * sy
+    };
+  }
+
+  canvas.addEventListener("mousemove", (e) => {
+    const p = canvasPos(e);
+    mouse.x = p.x; mouse.y = p.y;
+  });
+
+  canvas.addEventListener("mousedown", (e) => {
+    const p = canvasPos(e);
+    mouse.x = p.x; mouse.y = p.y;
+    handleMouseDown();
+  });
+
+  window.addEventListener("mouseup", () => handleMouseUp());
+
+  // Touch: tap/hold
+  canvas.addEventListener("touchstart", (e) => {
+    e.preventDefault();
+    const t = e.changedTouches[0];
+    const rect = canvas.getBoundingClientRect();
+    const sx = canvas.width / rect.width;
+    const sy = canvas.height / rect.height;
+    mouse.x = (t.clientX - rect.left) * sx;
+    mouse.y = (t.clientY - rect.top) * sy;
+    handleMouseDown();
+  }, {passive:false});
+
+  canvas.addEventListener("touchend", (e) => {
+    e.preventDefault();
+    handleMouseUp();
+  }, {passive:false});
+
+  // Buttons + keys
+  startBtn.addEventListener("click", startGame);
+  pauseBtn.addEventListener("click", togglePause);
+  resetBtn.addEventListener("click", resetGame);
+
+  window.addEventListener("keydown", (e) => {
+    if(e.code === "Space"){
+      e.preventDefault();
+      if(running) togglePause();
+      return;
+    }
+    if(e.key === "r" || e.key === "R"){
+      resetGame();
+      return;
+    }
+    if(e.key === "1"){ modeSel.value = "semi"; syncControls(); }
+    if(e.key === "2"){ modeSel.value = "burst"; syncControls(); }
+    if(e.key === "3"){ modeSel.value = "auto"; syncControls(); }
+  });
+
+  // Controls change
+  durSlider.addEventListener("input", () => { syncControls(); });
+  rofSlider.addEventListener("input", () => { syncControls(); });
+  modeSel.addEventListener("change", () => { syncControls(); });
+
+  clearLbBtn.addEventListener("click", () => {
+    localStorage.removeItem(LB_KEY);
+    renderLB();
+  });
+
+  // Init
+  nameInput.value = nameInput.value || "Fang";
+  syncControls();
+  renderLB();
+  resetGame();
+})();
+</script>
+</body>
+</html>

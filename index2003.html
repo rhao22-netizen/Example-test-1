@@ -1,0 +1,922 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Image Coordinate Digitizer</title>
+
+  <!-- PWA -->
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#0b0f14">
+
+  <style>
+    :root { --bg:#0b0f14; --panel:#111826; --text:#e7eefc; --muted:#a7b3c8; --accent:#6aa6ff; --danger:#ff6a6a; }
+    html, body { height:100%; margin:0; background:var(--bg); color:var(--text);
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial; }
+    .wrap { display:grid; grid-template-columns: 390px 1fr; height:100%; }
+    .panel {
+      background:linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02));
+      border-right:1px solid rgba(255,255,255,0.08);
+      padding:16px; overflow:auto;
+    }
+    .panel h1 { font-size:18px; margin:0 0 10px; }
+    .panel .sub { font-size:12px; color:var(--muted); line-height:1.45; margin-bottom:12px; }
+
+    .row { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin:10px 0; }
+    .hr { height:1px; background: rgba(255,255,255,0.08); margin: 12px 0; }
+
+    button, .fileBtn {
+      background:rgba(255,255,255,0.06); color:var(--text);
+      border:1px solid rgba(255,255,255,0.10);
+      border-radius:10px; padding:10px 12px; cursor:pointer;
+      user-select:none;
+    }
+    button:hover, .fileBtn:hover { border-color: rgba(106,166,255,0.6); }
+    button.primary { background: rgba(106,166,255,0.18); border-color: rgba(106,166,255,0.45); }
+    button.danger { background: rgba(255,106,106,0.14); border-color: rgba(255,106,106,0.45); }
+    button.small { padding:8px 10px; border-radius:10px; font-size:12px; }
+
+    label { font-size:12px; color:var(--muted); display:block; margin:8px 0 6px; }
+    input[type="number"]{
+      width: 100%; box-sizing: border-box;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.10);
+      color: var(--text);
+      border-radius: 10px;
+      padding: 10px 10px;
+      outline: none;
+    }
+
+    .kv { display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin:10px 0 0; }
+    .card {
+      background:rgba(255,255,255,0.04);
+      border:1px solid rgba(255,255,255,0.08);
+      border-radius:14px; padding:10px;
+    }
+    .card .label { font-size:12px; color:var(--muted); }
+    .card .value { font-size:14px; margin-top:6px; font-variant-numeric: tabular-nums; }
+
+    .tiny { font-size:12px; color:var(--muted); line-height:1.45; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+    .ok { color: rgba(180,255,200,0.95); }
+    .warn { color: rgba(255,210,140,0.95); }
+
+    .points { margin-top:12px; }
+    .points h2 { font-size:14px; margin:12px 0 8px; color:var(--text); }
+    table { width:100%; border-collapse:collapse; font-size:12px; }
+    th, td { text-align:left; padding:8px 6px; border-bottom:1px solid rgba(255,255,255,0.08); }
+    th { color:var(--muted); font-weight:600; }
+
+    .canvasWrap { position:relative; overflow:hidden; }
+    canvas { display:block; width:100%; height:100%; }
+
+    .hint {
+      position:absolute; left:14px; top:14px;
+      background:rgba(0,0,0,0.5);
+      border:1px solid rgba(255,255,255,0.12);
+      border-radius:12px; padding:10px 12px; font-size:12px; color:var(--text);
+      max-width:min(720px, 82vw);
+    }
+
+    .fileRow { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+    #file { display:none; }
+    .fileName { font-size:12px; color:var(--muted); }
+    .checkRow { display:flex; align-items:center; gap:10px; margin-top:10px; }
+    input[type="checkbox"]{ transform: scale(1.1); }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <aside class="panel">
+      <h1>Image Coordinate Digitizer</h1>
+      <div class="sub">
+        Upload an image, calibrate X and Y axes (two points each), then click to read coordinates in your own coordinate system.
+      </div>
+
+      <div class="fileRow">
+        <label class="fileBtn" for="file">Choose Image…</label>
+        <span class="fileName" id="fileName">No file selected</span>
+      </div>
+      <input id="file" type="file" accept="image/*" />
+
+      <div class="row">
+        <button id="fit" class="primary">Fit to Screen</button>
+        <button id="reset">Reset View</button>
+      </div>
+
+      <div class="hr"></div>
+
+      <div class="tiny">
+        <b>How to calibrate</b><br/>
+        1) Pick X Start + X End, enter their X values.<br/>
+        2) Pick Y Start + Y End, enter their Y values.<br/>
+        3) Click <span class="mono">Apply Calibration</span>.<br/><br/>
+        <b>Navigation</b>: Hold <span class="mono">Space</span> to pan (drag). Use wheel to zoom.
+      </div>
+
+      <div class="checkRow">
+        <input id="enableSharedStart" type="checkbox" />
+        <label for="enableSharedStart" style="margin:0;">Enable Shared Start (X0 &amp; Y0)</label>
+      </div>
+
+      <div class="row" id="sharedStartRow" style="display:none;">
+        <button id="pickSharedStart" class="primary">Pick Shared Start</button>
+        <span class="tiny">Sets X Start and Y Start to the same clicked point.</span>
+      </div>
+
+      <div class="row" style="margin-top:10px;">
+        <button id="pickX0" class="primary">Pick X Start</button>
+        <button id="pickX1" class="primary">Pick X End</button>
+      </div>
+      <label for="x0val">X value at X Start</label>
+      <input id="x0val" type="number" step="any" value="0" />
+      <label for="x1val">X value at X End</label>
+      <input id="x1val" type="number" step="any" value="100" />
+
+      <div class="row" style="margin-top:10px;">
+        <button id="pickY0" class="primary">Pick Y Start</button>
+        <button id="pickY1" class="primary">Pick Y End</button>
+      </div>
+      <label for="y0val">Y value at Y Start</label>
+      <input id="y0val" type="number" step="any" value="0" />
+      <label for="y1val">Y value at Y End</label>
+      <input id="y1val" type="number" step="any" value="100" />
+
+      <div class="row" style="margin-top:10px;">
+        <button id="applyCal" class="primary">Apply Calibration</button>
+        <button id="clearCal">Clear Calibration</button>
+      </div>
+
+      <div class="kv">
+        <div class="card">
+          <div class="label">Mode</div>
+          <div class="value" id="mode">Pick Points</div>
+        </div>
+        <div class="card">
+          <div class="label">Zoom</div>
+          <div class="value" id="zoomVal">1.00×</div>
+        </div>
+      </div>
+
+      <div class="kv">
+        <div class="card">
+          <div class="label">Calibration status</div>
+          <div class="value mono" id="calStatus"><span class="warn">Not calibrated</span></div>
+        </div>
+        <div class="card">
+          <div class="label">Hover (X, Y)</div>
+          <div class="value mono" id="hoverVal">—</div>
+        </div>
+      </div>
+
+      <div class="kv">
+        <div class="card">
+          <div class="label">X Start (img px)</div>
+          <div class="value mono" id="x0img">(—, —)</div>
+        </div>
+        <div class="card">
+          <div class="label">X End (img px)</div>
+          <div class="value mono" id="x1img">(—, —)</div>
+        </div>
+      </div>
+      <div class="kv">
+        <div class="card">
+          <div class="label">Y Start (img px)</div>
+          <div class="value mono" id="y0img">(—, —)</div>
+        </div>
+        <div class="card">
+          <div class="label">Y End (img px)</div>
+          <div class="value mono" id="y1img">(—, —)</div>
+        </div>
+      </div>
+
+      <div class="hr"></div>
+
+      <div class="row">
+        <button id="clearPoints" class="danger">Clear Points</button>
+        <button id="exportCsv">Download CSV</button>
+        <button id="downloadImage" class="primary">Download Annotated Image</button>
+      </div>
+
+      <div class="points">
+        <h2>Points</h2>
+        <div class="tiny">X,Y are in your calibrated coordinate system. imgX,imgY are raw image pixels.</div>
+        <table id="pointsTable">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>X</th>
+              <th>Y</th>
+              <th>imgX</th>
+              <th>imgY</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+
+      <div class="tiny" style="margin-top:12px;">
+        Safety: points are only picked on a true click. Dragging will not create points.
+      </div>
+    </aside>
+
+    <main class="canvasWrap">
+      <canvas id="c"></canvas>
+      <div class="hint">
+        <b>Controls</b><br/>
+        • Wheel: zoom (around cursor)<br/>
+        • Hold <span class="mono">Space</span> + drag: pan view (no points will be picked)<br/>
+        • Click: pick calibration points / add points (after calibration)
+      </div>
+    </main>
+  </div>
+
+<script>
+(() => {
+  // PWA: register Service Worker
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("./sw.js").catch(() => {});
+  }
+
+  const canvas = document.getElementById('c');
+  const ctx = canvas.getContext('2d');
+
+  const elFile = document.getElementById('file');
+  const elFileName = document.getElementById('fileName');
+
+  const elFit = document.getElementById('fit');
+  const elReset = document.getElementById('reset');
+
+  const elEnableSharedStart = document.getElementById('enableSharedStart');
+  const elSharedStartRow = document.getElementById('sharedStartRow');
+  const elPickSharedStart = document.getElementById('pickSharedStart');
+
+  const elPickX0 = document.getElementById('pickX0');
+  const elPickX1 = document.getElementById('pickX1');
+  const elPickY0 = document.getElementById('pickY0');
+  const elPickY1 = document.getElementById('pickY1');
+
+  const elX0Val = document.getElementById('x0val');
+  const elX1Val = document.getElementById('x1val');
+  const elY0Val = document.getElementById('y0val');
+  const elY1Val = document.getElementById('y1val');
+
+  const elApplyCal = document.getElementById('applyCal');
+  const elClearCal = document.getElementById('clearCal');
+
+  const elClearPoints = document.getElementById('clearPoints');
+  const elExportCsv = document.getElementById('exportCsv');
+  const elDownloadImage = document.getElementById('downloadImage');
+
+  const elMode = document.getElementById('mode');
+  const elZoomVal = document.getElementById('zoomVal');
+  const elCalStatus = document.getElementById('calStatus');
+  const elHoverVal = document.getElementById('hoverVal');
+
+  const elX0Img = document.getElementById('x0img');
+  const elX1Img = document.getElementById('x1img');
+  const elY0Img = document.getElementById('y0img');
+  const elY1Img = document.getElementById('y1img');
+
+  const table = document.getElementById('pointsTable');
+  const tbody = table.querySelector('tbody');
+
+  // Image
+  let img = null;
+  let imgW = 0, imgH = 0;
+  let lastImageFilenameBase = "image";
+
+  // View transform
+  let scale = 1;
+  let offsetX = 0;
+  let offsetY = 0;
+
+  // Space-to-pan
+  let spaceDown = false;
+
+  // Drag vs click protection
+  let isPanning = false;
+  let lastMouse = { x: 0, y: 0 };
+  let downMouse = { x: 0, y: 0 };
+  let didDrag = false;
+  const DRAG_THRESHOLD_PX = 6;
+
+  // Interaction mode
+  let mode = 'pick'; // pick | pickX0 | pickX1 | pickY0 | pickY1 | pickSharedStart
+  let hoverImgPt = null;
+
+  // Calibration points (image coords)
+  let X0 = null, X1 = null, Y0 = null, Y1 = null; // {x,y}
+  let calibrated = false;
+
+  // Calibration basis
+  let cal = null; // { O, ux, uy, kx, ky, x0val, y0val, X0, Y0 }
+
+  const points = []; // { imgX, imgY, X, Y }
+
+  function resize() {
+    const rect = canvas.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = Math.max(2, Math.floor(rect.width * dpr));
+    canvas.height = Math.max(2, Math.floor(rect.height * dpr));
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    draw();
+  }
+  window.addEventListener('resize', resize);
+
+  function screenToImage(sx, sy) {
+    return { x: (sx - offsetX) / scale, y: (sy - offsetY) / scale };
+  }
+  function imageToScreen(ix, iy) {
+    return { x: ix * scale + offsetX, y: iy * scale + offsetY };
+  }
+  function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
+  function withinImage(p) { return img && p.x >= 0 && p.y >= 0 && p.x <= imgW && p.y <= imgH; }
+  function setZoomText() { elZoomVal.textContent = `${scale.toFixed(2)}×`; }
+
+  function setMode(next) {
+    mode = next;
+    const labelMap = {
+      pick: 'Pick Points',
+      pickX0: 'Pick X Start (click image)',
+      pickX1: 'Pick X End (click image)',
+      pickY0: 'Pick Y Start (click image)',
+      pickY1: 'Pick Y End (click image)',
+      pickSharedStart: 'Pick Shared Start (X0 & Y0)'
+    };
+    elMode.textContent = labelMap[mode] || 'Pick Points';
+  }
+
+  function updateCursor() {
+    if (spaceDown) canvas.style.cursor = isPanning ? 'grabbing' : 'grab';
+    else canvas.style.cursor = 'crosshair';
+  }
+
+  function updateCalUI() {
+    elX0Img.textContent = X0 ? `(${X0.x.toFixed(1)}, ${X0.y.toFixed(1)})` : '(—, —)';
+    elX1Img.textContent = X1 ? `(${X1.x.toFixed(1)}, ${X1.y.toFixed(1)})` : '(—, —)';
+    elY0Img.textContent = Y0 ? `(${Y0.x.toFixed(1)}, ${Y0.y.toFixed(1)})` : '(—, —)';
+    elY1Img.textContent = Y1 ? `(${Y1.x.toFixed(1)}, ${Y1.y.toFixed(1)})` : '(—, —)';
+
+    if (calibrated) elCalStatus.innerHTML = `<span class="ok">Calibrated</span>`;
+    else elCalStatus.innerHTML = `<span class="warn">Not calibrated</span>`;
+  }
+
+  function lineIntersection(p1, p2, p3, p4) {
+    const x1=p1.x, y1=p1.y, x2=p2.x, y2=p2.y, x3=p3.x, y3=p3.y, x4=p4.x, y4=p4.y;
+    const den = (x1-x2)*(y3-y4) - (y1-y2)*(x3-x4);
+    if (Math.abs(den) < 1e-9) return null;
+    const px = ((x1*y2 - y1*x2)*(x3-x4) - (x1-x2)*(x3*y4 - y3*x4)) / den;
+    const py = ((x1*y2 - y1*x2)*(y3-y4) - (y1-y2)*(x3*y4 - y3*x4)) / den;
+    return { x: px, y: py };
+  }
+
+  function applyCalibration() {
+    if (!img || !X0 || !X1 || !Y0 || !Y1) {
+      calibrated = false; cal = null;
+      updateCalUI(); draw();
+      alert('Please pick X Start, X End, Y Start, and Y End first.');
+      return;
+    }
+
+    const x0val = Number(elX0Val.value);
+    const x1val = Number(elX1Val.value);
+    const y0val = Number(elY0Val.value);
+    const y1val = Number(elY1Val.value);
+
+    const vx = { x: X1.x - X0.x, y: X1.y - X0.y };
+    const vy = { x: Y1.x - Y0.x, y: Y1.y - Y0.y };
+
+    const lenx = Math.hypot(vx.x, vx.y);
+    const leny = Math.hypot(vy.x, vy.y);
+
+    if (lenx < 1e-6 || leny < 1e-6) {
+      calibrated = false; cal = null;
+      updateCalUI(); draw();
+      alert('Axis points are too close. Pick two distinct points for each axis.');
+      return;
+    }
+
+    const dxUnits = (x1val - x0val);
+    const dyUnits = (y1val - y0val);
+    if (Math.abs(dxUnits) < 1e-12 || Math.abs(dyUnits) < 1e-12) {
+      calibrated = false; cal = null;
+      updateCalUI(); draw();
+      alert('X or Y value range is zero. Set different start/end values.');
+      return;
+    }
+
+    const ux = { x: vx.x / lenx, y: vx.y / lenx };
+    const uy = { x: vy.x / leny, y: vy.y / leny };
+    const O = lineIntersection(X0, X1, Y0, Y1) || { x: X0.x, y: X0.y };
+
+    const kx = dxUnits / lenx;
+    const ky = dyUnits / leny;
+
+    cal = { O, ux, uy, kx, ky, x0val, y0val, X0, Y0 };
+    calibrated = true;
+
+    points.forEach(p => {
+      const out = imgToUser(p.imgX, p.imgY);
+      p.X = out.X; p.Y = out.Y;
+    });
+
+    updateCalUI();
+    rebuildTable();
+    draw();
+  }
+
+  function imgToUser(ix, iy) {
+    if (!cal) return { X: NaN, Y: NaN };
+
+    const rx = { x: ix - cal.X0.x, y: iy - cal.X0.y };
+    const projX = rx.x * cal.ux.x + rx.y * cal.ux.y;
+    const X = cal.x0val + projX * cal.kx;
+
+    const ry = { x: ix - cal.Y0.x, y: iy - cal.Y0.y };
+    const projY = ry.x * cal.uy.x + ry.y * cal.uy.y;
+    const Y = cal.y0val + projY * cal.ky;
+
+    return { X, Y };
+  }
+
+  function fitToScreen() {
+    if (!img) return;
+    const rect = canvas.getBoundingClientRect();
+    const cw = rect.width, ch = rect.height;
+    const pad = 40;
+    const sx = (cw - pad) / imgW;
+    const sy = (ch - pad) / imgH;
+    scale = Math.max(0.05, Math.min(sx, sy));
+    offsetX = (cw - imgW * scale) / 2;
+    offsetY = (ch - imgH * scale) / 2;
+    setZoomText();
+    draw();
+  }
+
+  function resetView() {
+    scale = 1;
+    offsetX = 20;
+    offsetY = 20;
+    setZoomText();
+    draw();
+  }
+
+  function drawMarkerOn(g, pt, label, color='rgba(106,166,255,0.95)', toScreenFn=imageToScreen) {
+    const s = toScreenFn(pt.x, pt.y);
+    g.save();
+    g.strokeStyle = color;
+    g.lineWidth = 2;
+    const r = 7;
+    g.beginPath();
+    g.moveTo(s.x - r, s.y); g.lineTo(s.x + r, s.y);
+    g.moveTo(s.x, s.y - r); g.lineTo(s.x, s.y + r);
+    g.stroke();
+
+    g.fillStyle = 'rgba(255,255,255,0.9)';
+    g.font = '12px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace';
+    g.fillText(label, s.x + 10, s.y - 10);
+    g.restore();
+  }
+
+  function drawAxesOn(g, toScreenFn=imageToScreen) {
+    if (!calibrated || !cal) return;
+
+    g.save();
+    g.strokeStyle = 'rgba(106,166,255,0.85)';
+    g.lineWidth = 2;
+
+    const O = cal.O;
+    const L = 2000;
+    const xA = { x: O.x - cal.ux.x * L, y: O.y - cal.ux.y * L };
+    const xB = { x: O.x + cal.ux.x * L, y: O.y + cal.ux.y * L };
+    const yA = { x: O.x - cal.uy.x * L, y: O.y - cal.uy.y * L };
+    const yB = { x: O.x + cal.uy.x * L, y: O.y + cal.uy.y * L };
+
+    const sxA = toScreenFn(xA.x, xA.y);
+    const sxB = toScreenFn(xB.x, xB.y);
+    g.beginPath(); g.moveTo(sxA.x, sxA.y); g.lineTo(sxB.x, sxB.y); g.stroke();
+
+    const syA = toScreenFn(yA.x, yA.y);
+    const syB = toScreenFn(yB.x, yB.y);
+    g.beginPath(); g.moveTo(syA.x, syA.y); g.lineTo(syB.x, syB.y); g.stroke();
+
+    const so = toScreenFn(O.x, O.y);
+    g.fillStyle = 'rgba(231,238,252,0.95)';
+    g.font = '13px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace';
+    g.fillText('X axis', so.x + 10, so.y + 16);
+    g.fillText('Y axis', so.x + 10, so.y + 34);
+
+    g.restore();
+  }
+
+  function drawPointsOn(g, toScreenFn=imageToScreen) {
+    g.save();
+    for (let i = 0; i < points.length; i++) {
+      const p = points[i];
+      const s = toScreenFn(p.imgX, p.imgY);
+      g.strokeStyle = 'rgba(255,106,106,0.95)';
+      g.lineWidth = 2;
+      const r = 6;
+      g.beginPath();
+      g.moveTo(s.x - r, s.y); g.lineTo(s.x + r, s.y);
+      g.moveTo(s.x, s.y - r); g.lineTo(s.x, s.y + r);
+      g.stroke();
+
+      g.fillStyle = 'rgba(255,255,255,0.9)';
+      g.font = '12px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace';
+      g.fillText(`#${i+1}`, s.x + 8, s.y - 8);
+    }
+    g.restore();
+  }
+
+  function drawHover() {
+    if (!hoverImgPt || !img) return;
+    if (!withinImage(hoverImgPt)) return;
+
+    const s = imageToScreen(hoverImgPt.x, hoverImgPt.y);
+    ctx.save();
+    ctx.strokeStyle = 'rgba(231,238,252,0.45)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4,4]);
+    ctx.beginPath();
+    ctx.moveTo(s.x, 0); ctx.lineTo(s.x, canvas.getBoundingClientRect().height);
+    ctx.moveTo(0, s.y); ctx.lineTo(canvas.getBoundingClientRect().width, s.y);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.restore();
+  }
+
+  function draw() {
+    const rect = canvas.getBoundingClientRect();
+    const w = rect.width, h = rect.height;
+
+    ctx.clearRect(0, 0, w, h);
+
+    // subtle grid
+    ctx.save();
+    ctx.strokeStyle = 'rgba(255,255,255,0.04)';
+    ctx.lineWidth = 1;
+    for (let x = 0; x < w; x += 40) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke(); }
+    for (let y = 0; y < h; y += 40) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke(); }
+    ctx.restore();
+
+    if (img) {
+      ctx.save();
+      ctx.translate(offsetX, offsetY);
+      ctx.scale(scale, scale);
+      ctx.drawImage(img, 0, 0);
+      ctx.restore();
+
+      if (X0) drawMarkerOn(ctx, X0, 'X0', 'rgba(106,166,255,0.95)');
+      if (X1) drawMarkerOn(ctx, X1, 'X1', 'rgba(106,166,255,0.95)');
+      if (Y0) drawMarkerOn(ctx, Y0, 'Y0', 'rgba(106,255,180,0.95)');
+      if (Y1) drawMarkerOn(ctx, Y1, 'Y1', 'rgba(106,255,180,0.95)');
+
+      drawAxesOn(ctx);
+      drawPointsOn(ctx);
+      drawHover();
+    } else {
+      ctx.save();
+      ctx.fillStyle = 'rgba(231,238,252,0.7)';
+      ctx.font = '16px system-ui, -apple-system, Segoe UI, Roboto';
+      ctx.fillText('Choose an image to begin', 24, 48);
+      ctx.restore();
+    }
+
+    setZoomText();
+    updateCalUI();
+    updateCursor();
+  }
+
+  function rebuildTable() {
+    tbody.innerHTML = '';
+    points.forEach((p, i) => {
+      const tr = document.createElement('tr');
+
+      const tdIdx = document.createElement('td');
+      tdIdx.textContent = String(i + 1);
+      tr.appendChild(tdIdx);
+
+      const tdX = document.createElement('td');
+      tdX.textContent = Number.isFinite(p.X) ? p.X.toFixed(6) : '—';
+      tdX.className = 'mono';
+      tr.appendChild(tdX);
+
+      const tdY = document.createElement('td');
+      tdY.textContent = Number.isFinite(p.Y) ? p.Y.toFixed(6) : '—';
+      tdY.className = 'mono';
+      tr.appendChild(tdY);
+
+      const tdIX = document.createElement('td');
+      tdIX.textContent = p.imgX.toFixed(2);
+      tdIX.className = 'mono';
+      tr.appendChild(tdIX);
+
+      const tdIY = document.createElement('td');
+      tdIY.textContent = p.imgY.toFixed(2);
+      tdIY.className = 'mono';
+      tr.appendChild(tdIY);
+
+      const tdBtn = document.createElement('td');
+      const del = document.createElement('button');
+      del.textContent = 'Del';
+      del.className = 'danger small';
+      del.addEventListener('click', (e) => {
+        e.stopPropagation();
+        points.splice(i, 1);
+        rebuildTable();
+        draw();
+      });
+      tdBtn.appendChild(del);
+      tr.appendChild(tdBtn);
+
+      tr.style.cursor = 'pointer';
+      tr.addEventListener('click', () => {
+        const rect = canvas.getBoundingClientRect();
+        const target = imageToScreen(p.imgX, p.imgY);
+        offsetX += (rect.width / 2 - target.x);
+        offsetY += (rect.height / 2 - target.y);
+        draw();
+      });
+
+      tbody.appendChild(tr);
+    });
+  }
+
+  // Download helpers
+  function downloadBlob(blob, filename) {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
+  function baseNameNoExt(name) {
+    const dot = name.lastIndexOf('.');
+    if (dot === -1) return name || "image";
+    return name.slice(0, dot) || "image";
+  }
+
+  function downloadAnnotatedImage() {
+    if (!img) {
+      alert("Please choose an image first.");
+      return;
+    }
+
+    // Export at ORIGINAL image resolution: (imgW x imgH)
+    const out = document.createElement('canvas');
+    out.width = imgW;
+    out.height = imgH;
+    const g = out.getContext('2d');
+
+    // Draw base image
+    g.drawImage(img, 0, 0);
+
+    // In export canvas, image coords == screen coords (identity mapping)
+    const toScreen = (x, y) => ({ x, y });
+
+    // Draw overlays in image coordinate space
+    if (X0) drawMarkerOn(g, X0, 'X0', 'rgba(106,166,255,0.95)', toScreen);
+    if (X1) drawMarkerOn(g, X1, 'X1', 'rgba(106,166,255,0.95)', toScreen);
+    if (Y0) drawMarkerOn(g, Y0, 'Y0', 'rgba(106,255,180,0.95)', toScreen);
+    if (Y1) drawMarkerOn(g, Y1, 'Y1', 'rgba(106,255,180,0.95)', toScreen);
+
+    drawAxesOn(g, toScreen);
+    drawPointsOn(g, toScreen);
+
+    // Add a small footer text (optional, safe)
+    g.save();
+    g.fillStyle = 'rgba(0,0,0,0.45)';
+    g.fillRect(0, out.height - 28, out.width, 28);
+    g.fillStyle = 'rgba(255,255,255,0.9)';
+    g.font = '14px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace';
+    g.fillText('Image Coordinate Digitizer - annotated export', 10, out.height - 10);
+    g.restore();
+
+    out.toBlob((blob) => {
+      if (!blob) return;
+      const filename = `${lastImageFilenameBase}_annotated.png`;
+      downloadBlob(blob, filename);
+    }, 'image/png');
+  }
+
+  // --- Shared start toggle ---
+  elEnableSharedStart.addEventListener('change', () => {
+    elSharedStartRow.style.display = elEnableSharedStart.checked ? 'flex' : 'none';
+    if (!elEnableSharedStart.checked && mode === 'pickSharedStart') setMode('pick');
+  });
+
+  // --- Keyboard: Space-to-pan ---
+  window.addEventListener('keydown', (e) => {
+    if (e.code === 'Space') {
+      e.preventDefault();
+      if (!spaceDown) { spaceDown = true; updateCursor(); }
+    }
+  }, { passive: false });
+
+  window.addEventListener('keyup', (e) => {
+    if (e.code === 'Space') {
+      spaceDown = false;
+      isPanning = false;
+      updateCursor();
+    }
+  });
+
+  // --- File load ---
+  elFile.addEventListener('change', (e) => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+
+    elFileName.textContent = f.name;
+    lastImageFilenameBase = baseNameNoExt(f.name);
+
+    const url = URL.createObjectURL(f);
+    const image = new Image();
+    image.onload = () => {
+      img = image;
+      imgW = img.naturalWidth;
+      imgH = img.naturalHeight;
+
+      // reset
+      points.length = 0;
+      X0 = X1 = Y0 = Y1 = null;
+      calibrated = false;
+      cal = null;
+      rebuildTable();
+      setMode('pick');
+
+      fitToScreen();
+      URL.revokeObjectURL(url);
+    };
+    image.src = url;
+  });
+
+  // --- Buttons ---
+  elFit.addEventListener('click', fitToScreen);
+  elReset.addEventListener('click', resetView);
+
+  elPickX0.addEventListener('click', () => { if (!img) return; setMode('pickX0'); });
+  elPickX1.addEventListener('click', () => { if (!img) return; setMode('pickX1'); });
+  elPickY0.addEventListener('click', () => { if (!img) return; setMode('pickY0'); });
+  elPickY1.addEventListener('click', () => { if (!img) return; setMode('pickY1'); });
+
+  elPickSharedStart.addEventListener('click', () => { if (!img) return; setMode('pickSharedStart'); });
+
+  elApplyCal.addEventListener('click', applyCalibration);
+
+  elClearCal.addEventListener('click', () => {
+    X0 = X1 = Y0 = Y1 = null;
+    calibrated = false;
+    cal = null;
+    updateCalUI();
+
+    points.forEach(p => { p.X = NaN; p.Y = NaN; });
+    rebuildTable();
+    setMode('pick');
+    draw();
+  });
+
+  elClearPoints.addEventListener('click', () => {
+    points.length = 0;
+    rebuildTable();
+    draw();
+  });
+
+  elExportCsv.addEventListener('click', () => {
+    if (!points.length) {
+      alert("No points to export.");
+      return;
+    }
+
+    const header = 'index,X,Y,imgX,imgY\n';
+    const rows = points.map((p, i) => {
+      const X = Number.isFinite(p.X) ? p.X : '';
+      const Y = Number.isFinite(p.Y) ? p.Y : '';
+      return `${i+1},${X},${Y},${p.imgX.toFixed(6)},${p.imgY.toFixed(6)}`;
+    }).join('\n');
+
+    const blob = new Blob([header + rows], { type: 'text/csv;charset=utf-8' });
+    const filename = `${lastImageFilenameBase}_points.csv`;
+    downloadBlob(blob, filename);
+  });
+
+  elDownloadImage.addEventListener('click', downloadAnnotatedImage);
+
+  // --- Mouse: Space + drag pans; dragging never picks points ---
+  canvas.addEventListener('mousedown', (e) => {
+    if (!img) return;
+
+    didDrag = false;
+    downMouse = { x: e.offsetX, y: e.offsetY };
+    lastMouse = { x: e.offsetX, y: e.offsetY };
+
+    if (spaceDown) {
+      isPanning = true;
+      updateCursor();
+    } else {
+      isPanning = false;
+    }
+  });
+
+  window.addEventListener('mouseup', () => {
+    isPanning = false;
+    updateCursor();
+  });
+
+  canvas.addEventListener('mousemove', (e) => {
+    if (!img) return;
+
+    const p = screenToImage(e.offsetX, e.offsetY);
+    hoverImgPt = p;
+
+    if (withinImage(p) && calibrated && cal) {
+      const out = imgToUser(p.x, p.y);
+      elHoverVal.textContent = `(${out.X.toFixed(6)}, ${out.Y.toFixed(6)})`;
+    } else if (withinImage(p)) {
+      elHoverVal.textContent = '(calibrate axes first)';
+    } else {
+      elHoverVal.textContent = '—';
+    }
+
+    if (isPanning && spaceDown && e.buttons === 1) {
+      const dx = e.offsetX - lastMouse.x;
+      const dy = e.offsetY - lastMouse.y;
+      offsetX += dx;
+      offsetY += dy;
+      lastMouse = { x: e.offsetX, y: e.offsetY };
+
+      const dist = Math.hypot(e.offsetX - downMouse.x, e.offsetY - downMouse.y);
+      if (dist > DRAG_THRESHOLD_PX) didDrag = true;
+
+      draw();
+      return;
+    }
+
+    draw();
+  });
+
+  canvas.addEventListener('click', (e) => {
+    if (!img) return;
+    if (didDrag) return;
+
+    const p = screenToImage(e.offsetX, e.offsetY);
+    if (!withinImage(p)) return;
+
+    if (mode === 'pickSharedStart') {
+      X0 = { x: p.x, y: p.y };
+      Y0 = { x: p.x, y: p.y };
+      calibrated = false; cal = null;
+      setMode('pick');
+      updateCalUI();
+      draw();
+      return;
+    }
+
+    if (mode === 'pickX0') { X0 = { x: p.x, y: p.y }; calibrated = false; cal = null; setMode('pick'); updateCalUI(); draw(); return; }
+    if (mode === 'pickX1') { X1 = { x: p.x, y: p.y }; calibrated = false; cal = null; setMode('pick'); updateCalUI(); draw(); return; }
+    if (mode === 'pickY0') { Y0 = { x: p.x, y: p.y }; calibrated = false; cal = null; setMode('pick'); updateCalUI(); draw(); return; }
+    if (mode === 'pickY1') { Y1 = { x: p.x, y: p.y }; calibrated = false; cal = null; setMode('pick'); updateCalUI(); draw(); return; }
+
+    if (!calibrated || !cal) {
+      alert('Please calibrate X and Y axes first (pick 2 points each and click Apply Calibration).');
+      return;
+    }
+
+    const out = imgToUser(p.x, p.y);
+    points.push({ imgX: p.x, imgY: p.y, X: out.X, Y: out.Y });
+    rebuildTable();
+    draw();
+  });
+
+  // Zoom wheel
+  canvas.addEventListener('wheel', (e) => {
+    if (!img) return;
+    e.preventDefault();
+
+    const mx = e.offsetX, my = e.offsetY;
+    const before = screenToImage(mx, my);
+
+    const zoomFactor = (e.deltaY < 0) ? 1.12 : 1 / 1.12;
+    const nextScale = clamp(scale * zoomFactor, 0.05, 50);
+
+    scale = nextScale;
+    const after = imageToScreen(before.x, before.y);
+    offsetX += (mx - after.x);
+    offsetY += (my - after.y);
+
+    setZoomText();
+    draw();
+  }, { passive: false });
+
+  // Init
+  setMode('pick');
+  resize();
+  updateCalUI();
+  updateCursor();
+})();
+</script>
+</body>
+</html>

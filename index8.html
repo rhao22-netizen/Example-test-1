@@ -786,7 +786,24 @@
     }
     ctx.restore();
 
-    // game over overlay
+    
+  // ===== DEBUG ORBIT (强制画火球) =====
+  const balls = orbitBalls();
+  ctx.save();
+  ctx.fillStyle = "rgba(255,180,80,0.95)";
+  ctx.strokeStyle = "rgba(0,0,0,0.35)";
+  ctx.lineWidth = 2;
+
+  for (const b of balls) {
+    ctx.beginPath();
+    ctx.arc(b.x, b.y, Math.max(4, b.r), 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+    
+  // game over overlay
     if (state.ended){
       ctx.save();
       ctx.fillStyle = "rgba(0,0,0,.55)";

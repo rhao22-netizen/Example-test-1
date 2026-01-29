@@ -4,6 +4,11 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Image Coordinate Digitizer</title>
+
+  <!-- PWA -->
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#0b0f14">
+
   <style>
     :root { --bg:#0b0f14; --panel:#111826; --text:#e7eefc; --muted:#a7b3c8; --accent:#6aa6ff; --danger:#ff6a6a; }
     html, body { height:100%; margin:0; background:var(--bg); color:var(--text);
@@ -189,7 +194,8 @@
 
       <div class="row">
         <button id="clearPoints" class="danger">Clear Points</button>
-        <button id="exportCsv">Export CSV</button>
+        <button id="exportCsv">Download CSV</button>
+        <button id="downloadImage" class="primary">Download Annotated Image</button>
       </div>
 
       <div class="points">
@@ -228,6 +234,11 @@
 
 <script>
 (() => {
+  // PWA: register Service Worker
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("./sw.js").catch(() => {});
+  }
+
   const canvas = document.getElementById('c');
   const ctx = canvas.getContext('2d');
 
@@ -256,6 +267,7 @@
 
   const elClearPoints = document.getElementById('clearPoints');
   const elExportCsv = document.getElementById('exportCsv');
+  const elDownloadImage = document.getElementById('downloadImage');
 
   const elMode = document.getElementById('mode');
   const elZoomVal = document.getElementById('zoomVal');
@@ -273,6 +285,7 @@
   // Image
   let img = null;
   let imgW = 0, imgH = 0;
+  let lastImageFilenameBase = "image";
 
   // View transform
   let scale = 1;
@@ -336,7 +349,6 @@
   }
 
   function updateCursor() {
-    // Only allow panning when Space is held
     if (spaceDown) canvas.style.cursor = isPanning ? 'grabbing' : 'grab';
     else canvas.style.cursor = 'crosshair';
   }
@@ -405,7 +417,6 @@
     cal = { O, ux, uy, kx, ky, x0val, y0val, X0, Y0 };
     calibrated = true;
 
-    // Recompute existing points
     points.forEach(p => {
       const out = imgToUser(p.imgX, p.imgY);
       p.X = out.X; p.Y = out.Y;
@@ -452,29 +463,29 @@
     draw();
   }
 
-  function drawMarker(pt, label, color='rgba(106,166,255,0.95)') {
-    const s = imageToScreen(pt.x, pt.y);
-    ctx.save();
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 2;
+  function drawMarkerOn(g, pt, label, color='rgba(106,166,255,0.95)', toScreenFn=imageToScreen) {
+    const s = toScreenFn(pt.x, pt.y);
+    g.save();
+    g.strokeStyle = color;
+    g.lineWidth = 2;
     const r = 7;
-    ctx.beginPath();
-    ctx.moveTo(s.x - r, s.y); ctx.lineTo(s.x + r, s.y);
-    ctx.moveTo(s.x, s.y - r); ctx.lineTo(s.x, s.y + r);
-    ctx.stroke();
+    g.beginPath();
+    g.moveTo(s.x - r, s.y); g.lineTo(s.x + r, s.y);
+    g.moveTo(s.x, s.y - r); g.lineTo(s.x, s.y + r);
+    g.stroke();
 
-    ctx.fillStyle = 'rgba(255,255,255,0.9)';
-    ctx.font = '12px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace';
-    ctx.fillText(label, s.x + 10, s.y - 10);
-    ctx.restore();
+    g.fillStyle = 'rgba(255,255,255,0.9)';
+    g.font = '12px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace';
+    g.fillText(label, s.x + 10, s.y - 10);
+    g.restore();
   }
 
-  function drawAxes() {
+  function drawAxesOn(g, toScreenFn=imageToScreen) {
     if (!calibrated || !cal) return;
 
-    ctx.save();
-    ctx.strokeStyle = 'rgba(106,166,255,0.85)';
-    ctx.lineWidth = 2;
+    g.save();
+    g.strokeStyle = 'rgba(106,166,255,0.85)';
+    g.lineWidth = 2;
 
     const O = cal.O;
     const L = 2000;
@@ -483,41 +494,41 @@
     const yA = { x: O.x - cal.uy.x * L, y: O.y - cal.uy.y * L };
     const yB = { x: O.x + cal.uy.x * L, y: O.y + cal.uy.y * L };
 
-    const sxA = imageToScreen(xA.x, xA.y);
-    const sxB = imageToScreen(xB.x, xB.y);
-    ctx.beginPath(); ctx.moveTo(sxA.x, sxA.y); ctx.lineTo(sxB.x, sxB.y); ctx.stroke();
+    const sxA = toScreenFn(xA.x, xA.y);
+    const sxB = toScreenFn(xB.x, xB.y);
+    g.beginPath(); g.moveTo(sxA.x, sxA.y); g.lineTo(sxB.x, sxB.y); g.stroke();
 
-    const syA = imageToScreen(yA.x, yA.y);
-    const syB = imageToScreen(yB.x, yB.y);
-    ctx.beginPath(); ctx.moveTo(syA.x, syA.y); ctx.lineTo(syB.x, syB.y); ctx.stroke();
+    const syA = toScreenFn(yA.x, yA.y);
+    const syB = toScreenFn(yB.x, yB.y);
+    g.beginPath(); g.moveTo(syA.x, syA.y); g.lineTo(syB.x, syB.y); g.stroke();
 
-    const so = imageToScreen(O.x, O.y);
-    ctx.fillStyle = 'rgba(231,238,252,0.95)';
-    ctx.font = '13px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace';
-    ctx.fillText('X axis', so.x + 10, so.y + 16);
-    ctx.fillText('Y axis', so.x + 10, so.y + 34);
+    const so = toScreenFn(O.x, O.y);
+    g.fillStyle = 'rgba(231,238,252,0.95)';
+    g.font = '13px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace';
+    g.fillText('X axis', so.x + 10, so.y + 16);
+    g.fillText('Y axis', so.x + 10, so.y + 34);
 
-    ctx.restore();
+    g.restore();
   }
 
-  function drawPoints() {
-    ctx.save();
+  function drawPointsOn(g, toScreenFn=imageToScreen) {
+    g.save();
     for (let i = 0; i < points.length; i++) {
       const p = points[i];
-      const s = imageToScreen(p.imgX, p.imgY);
-      ctx.strokeStyle = 'rgba(255,106,106,0.95)';
-      ctx.lineWidth = 2;
+      const s = toScreenFn(p.imgX, p.imgY);
+      g.strokeStyle = 'rgba(255,106,106,0.95)';
+      g.lineWidth = 2;
       const r = 6;
-      ctx.beginPath();
-      ctx.moveTo(s.x - r, s.y); ctx.lineTo(s.x + r, s.y);
-      ctx.moveTo(s.x, s.y - r); ctx.lineTo(s.x, s.y + r);
-      ctx.stroke();
+      g.beginPath();
+      g.moveTo(s.x - r, s.y); g.lineTo(s.x + r, s.y);
+      g.moveTo(s.x, s.y - r); g.lineTo(s.x, s.y + r);
+      g.stroke();
 
-      ctx.fillStyle = 'rgba(255,255,255,0.9)';
-      ctx.font = '12px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace';
-      ctx.fillText(`#${i+1}`, s.x + 8, s.y - 8);
+      g.fillStyle = 'rgba(255,255,255,0.9)';
+      g.font = '12px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace';
+      g.fillText(`#${i+1}`, s.x + 8, s.y - 8);
     }
-    ctx.restore();
+    g.restore();
   }
 
   function drawHover() {
@@ -558,14 +569,13 @@
       ctx.drawImage(img, 0, 0);
       ctx.restore();
 
-      // markers
-      if (X0) drawMarker(X0, 'X0', 'rgba(106,166,255,0.95)');
-      if (X1) drawMarker(X1, 'X1', 'rgba(106,166,255,0.95)');
-      if (Y0) drawMarker(Y0, 'Y0', 'rgba(106,255,180,0.95)');
-      if (Y1) drawMarker(Y1, 'Y1', 'rgba(106,255,180,0.95)');
+      if (X0) drawMarkerOn(ctx, X0, 'X0', 'rgba(106,166,255,0.95)');
+      if (X1) drawMarkerOn(ctx, X1, 'X1', 'rgba(106,166,255,0.95)');
+      if (Y0) drawMarkerOn(ctx, Y0, 'Y0', 'rgba(106,255,180,0.95)');
+      if (Y1) drawMarkerOn(ctx, Y1, 'Y1', 'rgba(106,255,180,0.95)');
 
-      drawAxes();
-      drawPoints();
+      drawAxesOn(ctx);
+      drawPointsOn(ctx);
       drawHover();
     } else {
       ctx.save();
@@ -635,6 +645,64 @@
     });
   }
 
+  // Download helpers
+  function downloadBlob(blob, filename) {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
+  function baseNameNoExt(name) {
+    const dot = name.lastIndexOf('.');
+    if (dot === -1) return name || "image";
+    return name.slice(0, dot) || "image";
+  }
+
+  function downloadAnnotatedImage() {
+    if (!img) {
+      alert("Please choose an image first.");
+      return;
+    }
+
+    // Export at ORIGINAL image resolution: (imgW x imgH)
+    const out = document.createElement('canvas');
+    out.width = imgW;
+    out.height = imgH;
+    const g = out.getContext('2d');
+
+    // Draw base image
+    g.drawImage(img, 0, 0);
+
+    // In export canvas, image coords == screen coords (identity mapping)
+    const toScreen = (x, y) => ({ x, y });
+
+    // Draw overlays in image coordinate space
+    if (X0) drawMarkerOn(g, X0, 'X0', 'rgba(106,166,255,0.95)', toScreen);
+    if (X1) drawMarkerOn(g, X1, 'X1', 'rgba(106,166,255,0.95)', toScreen);
+    if (Y0) drawMarkerOn(g, Y0, 'Y0', 'rgba(106,255,180,0.95)', toScreen);
+    if (Y1) drawMarkerOn(g, Y1, 'Y1', 'rgba(106,255,180,0.95)', toScreen);
+
+    drawAxesOn(g, toScreen);
+    drawPointsOn(g, toScreen);
+
+    // Add a small footer text (optional, safe)
+    g.save();
+    g.fillStyle = 'rgba(0,0,0,0.45)';
+    g.fillRect(0, out.height - 28, out.width, 28);
+    g.fillStyle = 'rgba(255,255,255,0.9)';
+    g.font = '14px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace';
+    g.fillText('Image Coordinate Digitizer - annotated export', 10, out.height - 10);
+    g.restore();
+
+    out.toBlob((blob) => {
+      if (!blob) return;
+      const filename = `${lastImageFilenameBase}_annotated.png`;
+      downloadBlob(blob, filename);
+    }, 'image/png');
+  }
+
   // --- Shared start toggle ---
   elEnableSharedStart.addEventListener('change', () => {
     elSharedStartRow.style.display = elEnableSharedStart.checked ? 'flex' : 'none';
@@ -644,12 +712,8 @@
   // --- Keyboard: Space-to-pan ---
   window.addEventListener('keydown', (e) => {
     if (e.code === 'Space') {
-      // prevent page scroll
       e.preventDefault();
-      if (!spaceDown) {
-        spaceDown = true;
-        updateCursor();
-      }
+      if (!spaceDown) { spaceDown = true; updateCursor(); }
     }
   }, { passive: false });
 
@@ -667,6 +731,7 @@
     if (!f) return;
 
     elFileName.textContent = f.name;
+    lastImageFilenameBase = baseNameNoExt(f.name);
 
     const url = URL.createObjectURL(f);
     const image = new Image();
@@ -721,7 +786,10 @@
   });
 
   elExportCsv.addEventListener('click', () => {
-    if (!points.length) return;
+    if (!points.length) {
+      alert("No points to export.");
+      return;
+    }
 
     const header = 'index,X,Y,imgX,imgY\n';
     const rows = points.map((p, i) => {
@@ -731,12 +799,11 @@
     }).join('\n');
 
     const blob = new Blob([header + rows], { type: 'text/csv;charset=utf-8' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = 'points.csv';
-    a.click();
-    URL.revokeObjectURL(a.href);
+    const filename = `${lastImageFilenameBase}_points.csv`;
+    downloadBlob(blob, filename);
   });
+
+  elDownloadImage.addEventListener('click', downloadAnnotatedImage);
 
   // --- Mouse: Space + drag pans; dragging never picks points ---
   canvas.addEventListener('mousedown', (e) => {
@@ -746,7 +813,6 @@
     downMouse = { x: e.offsetX, y: e.offsetY };
     lastMouse = { x: e.offsetX, y: e.offsetY };
 
-    // Only start panning if Space is held
     if (spaceDown) {
       isPanning = true;
       updateCursor();
@@ -794,14 +860,11 @@
 
   canvas.addEventListener('click', (e) => {
     if (!img) return;
-
-    // If it was a drag, do nothing
     if (didDrag) return;
 
     const p = screenToImage(e.offsetX, e.offsetY);
     if (!withinImage(p)) return;
 
-    // Shared start: set both X0 and Y0 at once
     if (mode === 'pickSharedStart') {
       X0 = { x: p.x, y: p.y };
       Y0 = { x: p.x, y: p.y };
@@ -812,13 +875,11 @@
       return;
     }
 
-    // Individual calibration picks
     if (mode === 'pickX0') { X0 = { x: p.x, y: p.y }; calibrated = false; cal = null; setMode('pick'); updateCalUI(); draw(); return; }
     if (mode === 'pickX1') { X1 = { x: p.x, y: p.y }; calibrated = false; cal = null; setMode('pick'); updateCalUI(); draw(); return; }
     if (mode === 'pickY0') { Y0 = { x: p.x, y: p.y }; calibrated = false; cal = null; setMode('pick'); updateCalUI(); draw(); return; }
     if (mode === 'pickY1') { Y1 = { x: p.x, y: p.y }; calibrated = false; cal = null; setMode('pick'); updateCalUI(); draw(); return; }
 
-    // Add point
     if (!calibrated || !cal) {
       alert('Please calibrate X and Y axes first (pick 2 points each and click Apply Calibration).');
       return;

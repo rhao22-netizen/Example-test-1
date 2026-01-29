@@ -1,7 +1,7 @@
 const CACHE = "remesur-v3";
 const ASSETS = [
   "./",
-  "./index.html",
+  "./index1.html",
   "./manifest.webmanifest",
   "./icon-192.png",
   "./icon-512.png"

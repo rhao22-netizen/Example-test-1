@@ -1,13 +1,13 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Image XY Picker</title>
+  <title>Image Coordinate Digitizer</title>
   <style>
     :root { --bg:#0b0f14; --panel:#111826; --text:#e7eefc; --muted:#a7b3c8; --accent:#6aa6ff; --danger:#ff6a6a; }
     html, body { height:100%; margin:0; background:var(--bg); color:var(--text); font-family: system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial; }
-    .wrap { display:grid; grid-template-columns: 360px 1fr; height:100%; }
+    .wrap { display:grid; grid-template-columns: 380px 1fr; height:100%; }
     .panel {
       background:linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02));
       border-right:1px solid rgba(255,255,255,0.08);
@@ -15,9 +15,20 @@
       overflow:auto;
     }
     .panel h1 { font-size:18px; margin:0 0 10px; }
-    .panel .sub { font-size:12px; color:var(--muted); line-height:1.4; margin-bottom:12px; }
+    .panel .sub { font-size:12px; color:var(--muted); line-height:1.45; margin-bottom:12px; }
     .row { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin:10px 0; }
     input[type="file"] { width:100%; }
+    input[type="number"], input[type="text"]{
+      width: 100%;
+      box-sizing: border-box;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.10);
+      color: var(--text);
+      border-radius: 10px;
+      padding: 10px 10px;
+      outline: none;
+    }
+    label { font-size:12px; color:var(--muted); display:block; margin:8px 0 6px; }
     button {
       background:rgba(255,255,255,0.06); color:var(--text);
       border:1px solid rgba(255,255,255,0.10);
@@ -26,6 +37,7 @@
     button:hover { border-color: rgba(106,166,255,0.6); }
     button.primary { background: rgba(106,166,255,0.18); border-color: rgba(106,166,255,0.45); }
     button.danger { background: rgba(255,106,106,0.14); border-color: rgba(255,106,106,0.45); }
+    button.small { padding:8px 10px; border-radius:10px; font-size:12px; }
     .kv { display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin:10px 0 0; }
     .card {
       background:rgba(255,255,255,0.04);
@@ -39,7 +51,7 @@
     table { width:100%; border-collapse:collapse; font-size:12px; }
     th, td { text-align:left; padding:8px 6px; border-bottom:1px solid rgba(255,255,255,0.08); }
     th { color:var(--muted); font-weight:600; }
-    .tiny { font-size:12px; color:var(--muted); }
+    .tiny { font-size:12px; color:var(--muted); line-height:1.45; }
     .canvasWrap { position:relative; overflow:hidden; }
     canvas { display:block; width:100%; height:100%; }
     .hint {
@@ -47,19 +59,20 @@
       background:rgba(0,0,0,0.5);
       border:1px solid rgba(255,255,255,0.12);
       border-radius:12px; padding:10px 12px; font-size:12px; color:var(--text);
-      max-width:min(520px, 80vw);
+      max-width:min(640px, 82vw);
     }
     .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+    .hr { height:1px; background: rgba(255,255,255,0.08); margin: 12px 0; }
+    .ok { color: rgba(180,255,200,0.95); }
+    .warn { color: rgba(255,210,140,0.95); }
   </style>
 </head>
 <body>
   <div class="wrap">
     <aside class="panel">
-      <h1>Image XY Picker</h1>
+      <h1>Image Coordinate Digitizer</h1>
       <div class="sub">
-        1) 上传图片<br/>
-        2) （可选）设置原点：点 <span class="mono">Set Origin</span> 后在图上点一下原点位置<br/>
-        3) 在图上点选点：自动记录坐标（X右正，Y上正）
+        Upload an image, calibrate your X and Y axes (two points each), then click anywhere to read coordinates in your own coordinate system.
       </div>
 
       <input id="file" type="file" accept="image/*" />
@@ -69,37 +82,91 @@
         <button id="reset">Reset View</button>
       </div>
 
-      <div class="row">
-        <button id="setOrigin" class="primary">Set Origin</button>
-        <button id="clearPoints" class="danger">Clear Points</button>
-        <button id="exportCsv">Export CSV</button>
+      <div class="hr"></div>
+
+      <div class="tiny">
+        <b>Calibration workflow</b><br/>
+        1) Calibrate X-axis: click <span class="mono">Pick X Start</span> and click the start point on the image, then do the same for <span class="mono">Pick X End</span>. Enter their X values.<br/>
+        2) Calibrate Y-axis: click <span class="mono">Pick Y Start</span> and <span class="mono">Pick Y End</span>. Enter their Y values.<br/>
+        After both axes are calibrated, click points to record (X,Y).
+      </div>
+
+      <div class="row" style="margin-top:10px;">
+        <button id="pickX0" class="primary">Pick X Start</button>
+        <button id="pickX1" class="primary">Pick X End</button>
+      </div>
+      <label for="x0val">X value at X Start</label>
+      <input id="x0val" type="number" step="any" value="0" />
+      <label for="x1val">X value at X End</label>
+      <input id="x1val" type="number" step="any" value="100" />
+
+      <div class="row" style="margin-top:10px;">
+        <button id="pickY0" class="primary">Pick Y Start</button>
+        <button id="pickY1" class="primary">Pick Y End</button>
+      </div>
+      <label for="y0val">Y value at Y Start</label>
+      <input id="y0val" type="number" step="any" value="0" />
+      <label for="y1val">Y value at Y End</label>
+      <input id="y1val" type="number" step="any" value="100" />
+
+      <div class="row" style="margin-top:10px;">
+        <button id="applyCal" class="primary">Apply Calibration</button>
+        <button id="clearCal">Clear Calibration</button>
       </div>
 
       <div class="kv">
         <div class="card">
-          <div class="label">当前模式</div>
+          <div class="label">Mode</div>
           <div class="value" id="mode">Pick Points</div>
         </div>
         <div class="card">
-          <div class="label">缩放</div>
+          <div class="label">Zoom</div>
           <div class="value" id="zoomVal">1.00×</div>
         </div>
       </div>
 
       <div class="kv">
         <div class="card">
-          <div class="label">原点 (image px)</div>
-          <div class="value mono" id="originVal">(0, 0)</div>
+          <div class="label">Calibration status</div>
+          <div class="value mono" id="calStatus"><span class="warn">Not calibrated</span></div>
         </div>
         <div class="card">
-          <div class="label">鼠标坐标 (X, Y)</div>
+          <div class="label">Hover (X, Y)</div>
           <div class="value mono" id="hoverVal">—</div>
         </div>
       </div>
 
+      <div class="kv">
+        <div class="card">
+          <div class="label">X Start (img px)</div>
+          <div class="value mono" id="x0img">(—, —)</div>
+        </div>
+        <div class="card">
+          <div class="label">X End (img px)</div>
+          <div class="value mono" id="x1img">(—, —)</div>
+        </div>
+      </div>
+      <div class="kv">
+        <div class="card">
+          <div class="label">Y Start (img px)</div>
+          <div class="value mono" id="y0img">(—, —)</div>
+        </div>
+        <div class="card">
+          <div class="label">Y End (img px)</div>
+          <div class="value mono" id="y1img">(—, —)</div>
+        </div>
+      </div>
+
+      <div class="hr"></div>
+
+      <div class="row">
+        <button id="clearPoints" class="danger">Clear Points</button>
+        <button id="exportCsv">Export CSV</button>
+      </div>
+
       <div class="points">
         <h2>Points</h2>
-        <div class="tiny">坐标单位：px（相对原点）。点击表格行可定位点。</div>
+        <div class="tiny">X,Y are in your calibrated coordinate system. imgX,imgY are raw image pixels.</div>
         <table id="pointsTable">
           <thead>
             <tr>
@@ -115,19 +182,16 @@
         </table>
       </div>
 
-      <div class="tiny" style="margin-top:12px; line-height:1.5;">
-        操作：<br/>
-        • 滚轮缩放（鼠标位置为中心）<br/>
-        • 按住左键拖动平移<br/>
-        • 点图：添加点（或设置原点）<br/>
+      <div class="tiny" style="margin-top:12px;">
+        Controls: wheel to zoom (around cursor), drag to pan, click to add point (after calibration).
       </div>
     </aside>
 
     <main class="canvasWrap">
       <canvas id="c"></canvas>
       <div class="hint">
-        <b>提示</b>：如果你需要“更精准”，先放大（滚轮），再点选点。<br/>
-        坐标系：X 向右为正，Y 向上为正（数学坐标系）。
+        <b>Tip:</b> Zoom in first for precision. Calibrate X and Y axes (two points each).<br/>
+        After calibration, click points to read coordinates in your own system.
       </div>
     </main>
   </div>
@@ -140,90 +204,222 @@
   const elFile = document.getElementById('file');
   const elFit = document.getElementById('fit');
   const elReset = document.getElementById('reset');
-  const elSetOrigin = document.getElementById('setOrigin');
+
+  const elPickX0 = document.getElementById('pickX0');
+  const elPickX1 = document.getElementById('pickX1');
+  const elPickY0 = document.getElementById('pickY0');
+  const elPickY1 = document.getElementById('pickY1');
+
+  const elX0Val = document.getElementById('x0val');
+  const elX1Val = document.getElementById('x1val');
+  const elY0Val = document.getElementById('y0val');
+  const elY1Val = document.getElementById('y1val');
+
+  const elApplyCal = document.getElementById('applyCal');
+  const elClearCal = document.getElementById('clearCal');
+
   const elClearPoints = document.getElementById('clearPoints');
   const elExportCsv = document.getElementById('exportCsv');
 
   const elMode = document.getElementById('mode');
   const elZoomVal = document.getElementById('zoomVal');
-  const elOriginVal = document.getElementById('originVal');
+  const elCalStatus = document.getElementById('calStatus');
   const elHoverVal = document.getElementById('hoverVal');
+
+  const elX0Img = document.getElementById('x0img');
+  const elX1Img = document.getElementById('x1img');
+  const elY0Img = document.getElementById('y0img');
+  const elY1Img = document.getElementById('y1img');
 
   const table = document.getElementById('pointsTable');
   const tbody = table.querySelector('tbody');
 
-  // State
+  // Image
   let img = null;
   let imgW = 0, imgH = 0;
 
-  // View transform: screen = (image * scale) + offset
+  // View transform
   let scale = 1;
   let offsetX = 0;
   let offsetY = 0;
 
-  // Origin in image coordinates (pixels, top-left is (0,0))
-  let origin = { x: 0, y: 0 };
-
   // Interaction
   let isPanning = false;
   let lastMouse = { x: 0, y: 0 };
-  let mode = 'pick'; // 'pick' | 'origin'
+  let mode = 'pick'; // pick | pickX0 | pickX1 | pickY0 | pickY1
   let hoverImgPt = null;
 
-  // Points stored in image coords + computed XY (relative to origin, y-up)
+  // Calibration points in image coords
+  let X0 = null, X1 = null, Y0 = null, Y1 = null; // {x,y} in image pixels
+  let calibrated = false;
+
+  // Affine mapping from image->user coordinates:
+  // X = aX*imgX + bX*imgY + cX
+  // Y = aY*imgX + bY*imgY + cY
+  let AX=0,BX=0,CX=0, AY=0,BY=0,CY=0;
+
   const points = []; // { imgX, imgY, X, Y }
 
-  // Resize canvas to fill
   function resize() {
     const rect = canvas.getBoundingClientRect();
     const dpr = window.devicePixelRatio || 1;
     canvas.width = Math.max(2, Math.floor(rect.width * dpr));
     canvas.height = Math.max(2, Math.floor(rect.height * dpr));
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0); // draw in CSS pixels
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     draw();
   }
   window.addEventListener('resize', resize);
 
-  // Helpers
   function screenToImage(sx, sy) {
-    // sx,sy in CSS pixels relative to canvas top-left
-    const ix = (sx - offsetX) / scale;
-    const iy = (sy - offsetY) / scale;
-    return { x: ix, y: iy };
+    return { x: (sx - offsetX) / scale, y: (sy - offsetY) / scale };
   }
-
   function imageToScreen(ix, iy) {
     return { x: ix * scale + offsetX, y: iy * scale + offsetY };
   }
-
   function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
+  function withinImage(p) { return img && p.x >= 0 && p.y >= 0 && p.x <= imgW && p.y <= imgH; }
 
   function setMode(next) {
     mode = next;
-    elMode.textContent = (mode === 'origin') ? 'Set Origin' : 'Pick Points';
-    canvas.style.cursor = (mode === 'origin') ? 'crosshair' : 'crosshair';
+    const labelMap = {
+      pick: 'Pick Points',
+      pickX0: 'Pick X Start (click image)',
+      pickX1: 'Pick X End (click image)',
+      pickY0: 'Pick Y Start (click image)',
+      pickY1: 'Pick Y End (click image)'
+    };
+    elMode.textContent = labelMap[mode] || 'Pick Points';
+    canvas.style.cursor = 'crosshair';
   }
 
-  function setZoomText() {
-    elZoomVal.textContent = `${scale.toFixed(2)}×`;
+  function setZoomText() { elZoomVal.textContent = `${scale.toFixed(2)}×`; }
+
+  function updateCalUI() {
+    elX0Img.textContent = X0 ? `(${X0.x.toFixed(1)}, ${X0.y.toFixed(1)})` : '(—, —)';
+    elX1Img.textContent = X1 ? `(${X1.x.toFixed(1)}, ${X1.y.toFixed(1)})` : '(—, —)';
+    elY0Img.textContent = Y0 ? `(${Y0.x.toFixed(1)}, ${Y0.y.toFixed(1)})` : '(—, —)';
+    elY1Img.textContent = Y1 ? `(${Y1.x.toFixed(1)}, ${Y1.y.toFixed(1)})` : '(—, —)';
+
+    if (calibrated) {
+      elCalStatus.innerHTML = `<span class="ok">Calibrated</span>`;
+    } else {
+      elCalStatus.innerHTML = `<span class="warn">Not calibrated</span>`;
+    }
   }
 
-  function setOriginText() {
-    elOriginVal.textContent = `(${origin.x.toFixed(1)}, ${origin.y.toFixed(1)})`;
+  // Solve for X mapping using two points along X-axis:
+  // X0->x0val, X1->x1val and require that Y0 and Y1 have no effect? We want general mapping.
+  // Practical approach:
+  // Treat axes as two independent directions.
+  // Define origin at X0 and Y0 intersection? BUT user provides X-axis points and Y-axis points separately.
+  // We implement a robust "vector basis" approach:
+  // - Use X-axis direction vector vx = (X1 - X0) in image pixels
+  // - Use Y-axis direction vector vy = (Y1 - Y0) in image pixels
+  // - Choose origin O as intersection of the two lines (X-axis line through X0-X1 and Y-axis line through Y0-Y1)
+  // - Scale factors: sx = (x1val - x0val) / |proj(vx)| (actually along vx), sy = (y1val - y0val) / |proj(vy)|
+  // - Then coordinate = (x0val, y0val) at O? Actually x0val is at X0, y0val at Y0.
+  // We'll compute O intersection, then define:
+  //   X(P) = x0val + ( (P - X0) dot ux ) * kx
+  //   Y(P) = y0val + ( (P - Y0) dot uy ) * ky
+  // where ux is unit along vx, uy is unit along vy, kx converts pixels->units along ux, ky converts pixels->units along uy.
+  // This matches your "start/end values" for each axis.
+  //
+  // Note: This assumes axes are straight and not skewed by perspective; good for most plots/images.
+
+  function lineIntersection(p1, p2, p3, p4) {
+    // returns intersection of lines p1->p2 and p3->p4 (infinite lines), or null if parallel
+    const x1=p1.x, y1=p1.y, x2=p2.x, y2=p2.y, x3=p3.x, y3=p3.y, x4=p4.x, y4=p4.y;
+    const den = (x1-x2)*(y3-y4) - (y1-y2)*(x3-x4);
+    if (Math.abs(den) < 1e-9) return null;
+    const px = ((x1*y2 - y1*x2)*(x3-x4) - (x1-x2)*(x3*y4 - y3*x4)) / den;
+    const py = ((x1*y2 - y1*x2)*(y3-y4) - (y1-y2)*(x3*y4 - y3*x4)) / den;
+    return { x: px, y: py };
   }
 
-  function computeXY(imgX, imgY) {
-    // X: right positive; Y: up positive (so invert image y direction)
-    const X = imgX - origin.x;
-    const Y = -(imgY - origin.y);
+  let cal = null; // { O, ux, uy, kx, ky, x0, y0 }
+
+  function applyCalibration() {
+    if (!img || !X0 || !X1 || !Y0 || !Y1) {
+      calibrated = false;
+      cal = null;
+      updateCalUI();
+      draw();
+      alert('Please pick X Start, X End, Y Start, and Y End on the image first.');
+      return;
+    }
+
+    const x0val = Number(elX0Val.value);
+    const x1val = Number(elX1Val.value);
+    const y0val = Number(elY0Val.value);
+    const y1val = Number(elY1Val.value);
+
+    // Axis directions
+    const vx = { x: X1.x - X0.x, y: X1.y - X0.y };
+    const vy = { x: Y1.x - Y0.x, y: Y1.y - Y0.y };
+
+    const lenx = Math.hypot(vx.x, vx.y);
+    const leny = Math.hypot(vy.x, vy.y);
+    if (lenx < 1e-6 || leny < 1e-6) {
+      calibrated = false;
+      cal = null;
+      updateCalUI();
+      draw();
+      alert('Axis points are too close. Please pick two distinct points for each axis.');
+      return;
+    }
+
+    const ux = { x: vx.x / lenx, y: vx.y / lenx };
+    const uy = { x: vy.x / leny, y: vy.y / leny };
+
+    // Intersection of the two axis lines (best estimate of origin)
+    const O = lineIntersection(X0, X1, Y0, Y1) || { x: X0.x, y: X0.y };
+
+    const dxUnits = (x1val - x0val);
+    const dyUnits = (y1val - y0val);
+    if (Math.abs(dxUnits) < 1e-12 || Math.abs(dyUnits) < 1e-12) {
+      calibrated = false;
+      cal = null;
+      updateCalUI();
+      draw();
+      alert('X or Y value range is zero. Please set different start/end values.');
+      return;
+    }
+
+    // Pixel-to-unit scale along each axis direction
+    // For X: moving along ux by "lenx" pixels changes X by dxUnits
+    const kx = dxUnits / lenx;
+    const ky = dyUnits / leny;
+
+    cal = { O, ux, uy, kx, ky, x0val, y0val, X0, Y0 };
+    calibrated = true;
+
+    // Recompute existing points
+    points.forEach(p => {
+      const out = imgToUser(p.imgX, p.imgY);
+      p.X = out.X; p.Y = out.Y;
+    });
+
+    updateCalUI();
+    rebuildTable();
+    draw();
+  }
+
+  function imgToUser(ix, iy) {
+    if (!cal) return { X: NaN, Y: NaN };
+
+    // X measured from X0 along ux, with X0 having value x0val
+    const rx = { x: ix - cal.X0.x, y: iy - cal.X0.y };
+    const projX = rx.x * cal.ux.x + rx.y * cal.ux.y; // pixels along X axis direction
+    const X = cal.x0val + projX * cal.kx;
+
+    // Y measured from Y0 along uy, with Y0 having value y0val
+    const ry = { x: ix - cal.Y0.x, y: iy - cal.Y0.y };
+    const projY = ry.x * cal.uy.x + ry.y * cal.uy.y; // pixels along Y axis direction
+    const Y = cal.y0val + projY * cal.ky;
+
     return { X, Y };
   }
 
-  function withinImage(p) {
-    return p.x >= 0 && p.y >= 0 && p.x <= imgW && p.y <= imgH;
-  }
-
-  // Fit image to canvas
   function fitToScreen() {
     if (!img) return;
     const rect = canvas.getBoundingClientRect();
@@ -232,7 +428,6 @@
     const sx = (cw - pad) / imgW;
     const sy = (ch - pad) / imgH;
     scale = Math.max(0.05, Math.min(sx, sy));
-    // center
     offsetX = (cw - imgW * scale) / 2;
     offsetY = (ch - imgH * scale) / 2;
     setZoomText();
@@ -247,69 +442,56 @@
     draw();
   }
 
-  // Draw axes (at origin) + ticks
-  function drawAxes() {
-    // origin in screen coords
-    const o = imageToScreen(origin.x, origin.y);
-
+  function drawMarker(pt, label, color='rgba(106,166,255,0.95)') {
+    const s = imageToScreen(pt.x, pt.y);
     ctx.save();
-    ctx.lineWidth = 1;
-
-    // axes lines
-    ctx.strokeStyle = 'rgba(106,166,255,0.95)';
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2;
+    const r = 7;
     ctx.beginPath();
-    // X axis (right)
-    ctx.moveTo(o.x, o.y);
-    ctx.lineTo(o.x + 200, o.y);
-    // Y axis (up)
-    ctx.moveTo(o.x, o.y);
-    ctx.lineTo(o.x, o.y - 200);
+    ctx.moveTo(s.x - r, s.y);
+    ctx.lineTo(s.x + r, s.y);
+    ctx.moveTo(s.x, s.y - r);
+    ctx.lineTo(s.x, s.y + r);
     ctx.stroke();
 
-    // Arrowheads
-    ctx.fillStyle = 'rgba(106,166,255,0.95)';
-    // X arrow
-    ctx.beginPath();
-    ctx.moveTo(o.x + 200, o.y);
-    ctx.lineTo(o.x + 190, o.y - 5);
-    ctx.lineTo(o.x + 190, o.y + 5);
-    ctx.closePath();
-    ctx.fill();
-    // Y arrow
-    ctx.beginPath();
-    ctx.moveTo(o.x, o.y - 200);
-    ctx.lineTo(o.x - 5, o.y - 190);
-    ctx.lineTo(o.x + 5, o.y - 190);
-    ctx.closePath();
-    ctx.fill();
-
-    // ticks (every 50px in screen space) for readability
-    ctx.strokeStyle = 'rgba(231,238,252,0.55)';
-    ctx.fillStyle = 'rgba(231,238,252,0.8)';
+    ctx.fillStyle = 'rgba(255,255,255,0.9)';
     ctx.font = '12px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace';
+    ctx.fillText(label, s.x + 10, s.y - 10);
+    ctx.restore();
+  }
 
-    const tickScreen = 50;
-    for (let i = 1; i <= 4; i++) {
-      // X ticks
-      const tx = o.x + i * tickScreen;
-      ctx.beginPath();
-      ctx.moveTo(tx, o.y - 4);
-      ctx.lineTo(tx, o.y + 4);
-      ctx.stroke();
-      ctx.fillText(`${(i * tickScreen / scale).toFixed(0)}`, tx - 8, o.y + 18);
+  function drawAxes() {
+    if (!calibrated || !cal) return;
 
-      // Y ticks (up)
-      const ty = o.y - i * tickScreen;
-      ctx.beginPath();
-      ctx.moveTo(o.x - 4, ty);
-      ctx.lineTo(o.x + 4, ty);
-      ctx.stroke();
-      ctx.fillText(`${(i * tickScreen / scale).toFixed(0)}`, o.x + 8, ty + 4);
-    }
+    ctx.save();
+    ctx.strokeStyle = 'rgba(106,166,255,0.85)';
+    ctx.lineWidth = 2;
 
-    // origin label
-    ctx.fillStyle = 'rgba(231,238,252,0.9)';
-    ctx.fillText('O', o.x + 6, o.y - 6);
+    // Draw long axis lines crossing origin intersection O
+    const O = cal.O;
+    const L = 2000; // long enough
+    const xA = { x: O.x - cal.ux.x * L, y: O.y - cal.ux.y * L };
+    const xB = { x: O.x + cal.ux.x * L, y: O.y + cal.ux.y * L };
+    const yA = { x: O.x - cal.uy.x * L, y: O.y - cal.uy.y * L };
+    const yB = { x: O.x + cal.uy.x * L, y: O.y + cal.uy.y * L };
+
+    // X line
+    const sxA = imageToScreen(xA.x, xA.y);
+    const sxB = imageToScreen(xB.x, xB.y);
+    ctx.beginPath(); ctx.moveTo(sxA.x, sxA.y); ctx.lineTo(sxB.x, sxB.y); ctx.stroke();
+
+    // Y line
+    const syA = imageToScreen(yA.x, yA.y);
+    const syB = imageToScreen(yB.x, yB.y);
+    ctx.beginPath(); ctx.moveTo(syA.x, syA.y); ctx.lineTo(syB.x, syB.y); ctx.stroke();
+
+    // labels near origin
+    const so = imageToScreen(O.x, O.y);
+    ctx.fillStyle = 'rgba(231,238,252,0.95)';
+    ctx.font = '13px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace';
+    ctx.fillText('X axis', so.x + 10, so.y + 16);
+    ctx.fillText('Y axis', so.x + 10, so.y + 34);
 
     ctx.restore();
   }
@@ -320,7 +502,6 @@
       const p = points[i];
       const s = imageToScreen(p.imgX, p.imgY);
 
-      // cross marker
       ctx.strokeStyle = 'rgba(255,106,106,0.95)';
       ctx.lineWidth = 2;
       const r = 6;
@@ -331,7 +512,6 @@
       ctx.lineTo(s.x, s.y + r);
       ctx.stroke();
 
-      // index label
       ctx.fillStyle = 'rgba(255,255,255,0.9)';
       ctx.font = '12px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace';
       ctx.fillText(`#${i+1}`, s.x + 8, s.y - 8);
@@ -345,15 +525,12 @@
 
     const s = imageToScreen(hoverImgPt.x, hoverImgPt.y);
     ctx.save();
-    ctx.strokeStyle = 'rgba(231,238,252,0.5)';
+    ctx.strokeStyle = 'rgba(231,238,252,0.45)';
     ctx.lineWidth = 1;
     ctx.setLineDash([4,4]);
     ctx.beginPath();
-    // crosshair lines
-    ctx.moveTo(s.x, 0);
-    ctx.lineTo(s.x, canvas.getBoundingClientRect().height);
-    ctx.moveTo(0, s.y);
-    ctx.lineTo(canvas.getBoundingClientRect().width, s.y);
+    ctx.moveTo(s.x, 0); ctx.lineTo(s.x, canvas.getBoundingClientRect().height);
+    ctx.moveTo(0, s.y); ctx.lineTo(canvas.getBoundingClientRect().width, s.y);
     ctx.stroke();
     ctx.setLineDash([]);
     ctx.restore();
@@ -365,25 +542,26 @@
 
     ctx.clearRect(0, 0, w, h);
 
-    // background grid (optional subtle)
+    // subtle grid
     ctx.save();
     ctx.strokeStyle = 'rgba(255,255,255,0.04)';
     ctx.lineWidth = 1;
-    for (let x = 0; x < w; x += 40) {
-      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
-    }
-    for (let y = 0; y < h; y += 40) {
-      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
-    }
+    for (let x = 0; x < w; x += 40) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke(); }
+    for (let y = 0; y < h; y += 40) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke(); }
     ctx.restore();
 
     if (img) {
-      // Draw image with transform
       ctx.save();
       ctx.translate(offsetX, offsetY);
       ctx.scale(scale, scale);
       ctx.drawImage(img, 0, 0);
       ctx.restore();
+
+      // calibration markers
+      if (X0) drawMarker(X0, 'X0', 'rgba(106,166,255,0.95)');
+      if (X1) drawMarker(X1, 'X1', 'rgba(106,166,255,0.95)');
+      if (Y0) drawMarker(Y0, 'Y0', 'rgba(106,255,180,0.95)');
+      if (Y1) drawMarker(Y1, 'Y1', 'rgba(106,255,180,0.95)');
 
       drawAxes();
       drawPoints();
@@ -392,12 +570,12 @@
       ctx.save();
       ctx.fillStyle = 'rgba(231,238,252,0.7)';
       ctx.font = '16px system-ui, -apple-system, Segoe UI, Roboto';
-      ctx.fillText('上传一张图片开始使用', 24, 48);
+      ctx.fillText('Upload an image to begin', 24, 48);
       ctx.restore();
     }
 
     setZoomText();
-    setOriginText();
+    updateCalUI();
   }
 
   function rebuildTable() {
@@ -410,31 +588,29 @@
       tr.appendChild(tdIdx);
 
       const tdX = document.createElement('td');
-      tdX.textContent = p.X.toFixed(2);
+      tdX.textContent = Number.isFinite(p.X) ? p.X.toFixed(6) : '—';
       tdX.className = 'mono';
       tr.appendChild(tdX);
 
       const tdY = document.createElement('td');
-      tdY.textContent = p.Y.toFixed(2);
+      tdY.textContent = Number.isFinite(p.Y) ? p.Y.toFixed(6) : '—';
       tdY.className = 'mono';
       tr.appendChild(tdY);
 
       const tdIX = document.createElement('td');
-      tdIX.textContent = p.imgX.toFixed(1);
+      tdIX.textContent = p.imgX.toFixed(2);
       tdIX.className = 'mono';
       tr.appendChild(tdIX);
 
       const tdIY = document.createElement('td');
-      tdIY.textContent = p.imgY.toFixed(1);
+      tdIY.textContent = p.imgY.toFixed(2);
       tdIY.className = 'mono';
       tr.appendChild(tdIY);
 
       const tdBtn = document.createElement('td');
       const del = document.createElement('button');
       del.textContent = 'Del';
-      del.className = 'danger';
-      del.style.padding = '6px 10px';
-      del.style.borderRadius = '10px';
+      del.className = 'danger small';
       del.addEventListener('click', (e) => {
         e.stopPropagation();
         points.splice(i, 1);
@@ -446,7 +622,6 @@
 
       tr.style.cursor = 'pointer';
       tr.addEventListener('click', () => {
-        // center view on this point
         const rect = canvas.getBoundingClientRect();
         const target = imageToScreen(p.imgX, p.imgY);
         offsetX += (rect.width / 2 - target.x);
@@ -459,7 +634,7 @@
   }
 
   // Events
-  elFile.addEventListener('change', async (e) => {
+  elFile.addEventListener('change', (e) => {
     const f = e.target.files?.[0];
     if (!f) return;
 
@@ -470,10 +645,14 @@
       imgW = img.naturalWidth;
       imgH = img.naturalHeight;
 
-      // set default origin to top-left (0,0)
-      origin = { x: 0, y: 0 };
+      // reset all
       points.length = 0;
+      X0 = X1 = Y0 = Y1 = null;
+      calibrated = false;
+      cal = null;
       rebuildTable();
+      updateCalUI();
+      setMode('pick');
 
       fitToScreen();
       URL.revokeObjectURL(url);
@@ -484,9 +663,23 @@
   elFit.addEventListener('click', fitToScreen);
   elReset.addEventListener('click', resetView);
 
-  elSetOrigin.addEventListener('click', () => {
-    if (!img) return;
-    setMode('origin');
+  elPickX0.addEventListener('click', () => { if (!img) return; setMode('pickX0'); });
+  elPickX1.addEventListener('click', () => { if (!img) return; setMode('pickX1'); });
+  elPickY0.addEventListener('click', () => { if (!img) return; setMode('pickY0'); });
+  elPickY1.addEventListener('click', () => { if (!img) return; setMode('pickY1'); });
+
+  elApplyCal.addEventListener('click', applyCalibration);
+
+  elClearCal.addEventListener('click', () => {
+    X0 = X1 = Y0 = Y1 = null;
+    calibrated = false;
+    cal = null;
+    updateCalUI();
+    // keep points but they'll show as —
+    points.forEach(p => { p.X = NaN; p.Y = NaN; });
+    rebuildTable();
+    setMode('pick');
+    draw();
   });
 
   elClearPoints.addEventListener('click', () => {
@@ -499,9 +692,11 @@
     if (!points.length) return;
 
     const header = 'index,X,Y,imgX,imgY\n';
-    const rows = points.map((p, i) =>
-      `${i+1},${p.X.toFixed(6)},${p.Y.toFixed(6)},${p.imgX.toFixed(6)},${p.imgY.toFixed(6)}`
-    ).join('\n');
+    const rows = points.map((p, i) => {
+      const X = Number.isFinite(p.X) ? p.X : '';
+      const Y = Number.isFinite(p.Y) ? p.Y : '';
+      return `${i+1},${X},${Y},${p.imgX.toFixed(6)},${p.imgY.toFixed(6)}`;
+    }).join('\n');
 
     const blob = new Blob([header + rows], { type: 'text/csv;charset=utf-8' });
     const a = document.createElement('a');
@@ -516,31 +711,27 @@
     isPanning = true;
     lastMouse = { x: e.offsetX, y: e.offsetY };
   });
-
-  window.addEventListener('mouseup', () => {
-    isPanning = false;
-  });
+  window.addEventListener('mouseup', () => { isPanning = false; });
 
   canvas.addEventListener('mousemove', (e) => {
     if (!img) return;
 
-    // Hover readout
     const p = screenToImage(e.offsetX, e.offsetY);
     hoverImgPt = p;
 
-    if (withinImage(p)) {
-      const { X, Y } = computeXY(p.x, p.y);
-      elHoverVal.textContent = `(${X.toFixed(2)}, ${Y.toFixed(2)})`;
+    if (withinImage(p) && calibrated && cal) {
+      const out = imgToUser(p.x, p.y);
+      elHoverVal.textContent = `(${out.X.toFixed(6)}, ${out.Y.toFixed(6)})`;
+    } else if (withinImage(p)) {
+      elHoverVal.textContent = '(calibrate axes first)';
     } else {
       elHoverVal.textContent = '—';
     }
 
-    // Pan
     if (isPanning && e.buttons === 1) {
       const dx = e.offsetX - lastMouse.x;
       const dy = e.offsetY - lastMouse.y;
-      offsetX += dx;
-      offsetY += dy;
+      offsetX += dx; offsetY += dy;
       lastMouse = { x: e.offsetX, y: e.offsetY };
       draw();
       return;
@@ -555,35 +746,35 @@
     const p = screenToImage(e.offsetX, e.offsetY);
     if (!withinImage(p)) return;
 
-    if (mode === 'origin') {
-      origin = { x: p.x, y: p.y };
-      setMode('pick');
-      draw();
+    // picking calibration points
+    if (mode === 'pickX0') { X0 = { x: p.x, y: p.y }; setMode('pick'); calibrated = false; cal = null; updateCalUI(); draw(); return; }
+    if (mode === 'pickX1') { X1 = { x: p.x, y: p.y }; setMode('pick'); calibrated = false; cal = null; updateCalUI(); draw(); return; }
+    if (mode === 'pickY0') { Y0 = { x: p.x, y: p.y }; setMode('pick'); calibrated = false; cal = null; updateCalUI(); draw(); return; }
+    if (mode === 'pickY1') { Y1 = { x: p.x, y: p.y }; setMode('pick'); calibrated = false; cal = null; updateCalUI(); draw(); return; }
+
+    // add point
+    if (!calibrated || !cal) {
+      alert('Please calibrate X and Y axes first (pick 2 points each and click Apply Calibration).');
       return;
     }
 
-    // add point
-    const { X, Y } = computeXY(p.x, p.y);
-    points.push({ imgX: p.x, imgY: p.y, X, Y });
+    const out = imgToUser(p.x, p.y);
+    points.push({ imgX: p.x, imgY: p.y, X: out.X, Y: out.Y });
     rebuildTable();
     draw();
   });
 
-  // Zoom with wheel (zoom to cursor)
+  // Zoom wheel
   canvas.addEventListener('wheel', (e) => {
     if (!img) return;
     e.preventDefault();
 
-    const rect = canvas.getBoundingClientRect();
-    const mx = e.offsetX;
-    const my = e.offsetY;
-
+    const mx = e.offsetX, my = e.offsetY;
     const before = screenToImage(mx, my);
 
     const zoomFactor = (e.deltaY < 0) ? 1.12 : 1 / 1.12;
     const nextScale = clamp(scale * zoomFactor, 0.05, 50);
 
-    // keep point under cursor stable
     scale = nextScale;
     const after = imageToScreen(before.x, before.y);
     offsetX += (mx - after.x);
@@ -596,6 +787,7 @@
   // Init
   setMode('pick');
   resize();
+  updateCalUI();
 })();
 </script>
 </body>

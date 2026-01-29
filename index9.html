@@ -1,0 +1,602 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Image XY Picker</title>
+  <style>
+    :root { --bg:#0b0f14; --panel:#111826; --text:#e7eefc; --muted:#a7b3c8; --accent:#6aa6ff; --danger:#ff6a6a; }
+    html, body { height:100%; margin:0; background:var(--bg); color:var(--text); font-family: system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial; }
+    .wrap { display:grid; grid-template-columns: 360px 1fr; height:100%; }
+    .panel {
+      background:linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02));
+      border-right:1px solid rgba(255,255,255,0.08);
+      padding:16px;
+      overflow:auto;
+    }
+    .panel h1 { font-size:18px; margin:0 0 10px; }
+    .panel .sub { font-size:12px; color:var(--muted); line-height:1.4; margin-bottom:12px; }
+    .row { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin:10px 0; }
+    input[type="file"] { width:100%; }
+    button {
+      background:rgba(255,255,255,0.06); color:var(--text);
+      border:1px solid rgba(255,255,255,0.10);
+      border-radius:10px; padding:10px 12px; cursor:pointer;
+    }
+    button:hover { border-color: rgba(106,166,255,0.6); }
+    button.primary { background: rgba(106,166,255,0.18); border-color: rgba(106,166,255,0.45); }
+    button.danger { background: rgba(255,106,106,0.14); border-color: rgba(255,106,106,0.45); }
+    .kv { display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin:10px 0 0; }
+    .card {
+      background:rgba(255,255,255,0.04);
+      border:1px solid rgba(255,255,255,0.08);
+      border-radius:14px; padding:10px;
+    }
+    .card .label { font-size:12px; color:var(--muted); }
+    .card .value { font-size:14px; margin-top:6px; font-variant-numeric: tabular-nums; }
+    .points { margin-top:12px; }
+    .points h2 { font-size:14px; margin:12px 0 8px; color:var(--text); }
+    table { width:100%; border-collapse:collapse; font-size:12px; }
+    th, td { text-align:left; padding:8px 6px; border-bottom:1px solid rgba(255,255,255,0.08); }
+    th { color:var(--muted); font-weight:600; }
+    .tiny { font-size:12px; color:var(--muted); }
+    .canvasWrap { position:relative; overflow:hidden; }
+    canvas { display:block; width:100%; height:100%; }
+    .hint {
+      position:absolute; left:14px; top:14px;
+      background:rgba(0,0,0,0.5);
+      border:1px solid rgba(255,255,255,0.12);
+      border-radius:12px; padding:10px 12px; font-size:12px; color:var(--text);
+      max-width:min(520px, 80vw);
+    }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <aside class="panel">
+      <h1>Image XY Picker</h1>
+      <div class="sub">
+        1) 上传图片<br/>
+        2) （可选）设置原点：点 <span class="mono">Set Origin</span> 后在图上点一下原点位置<br/>
+        3) 在图上点选点：自动记录坐标（X右正，Y上正）
+      </div>
+
+      <input id="file" type="file" accept="image/*" />
+
+      <div class="row">
+        <button id="fit" class="primary">Fit to Screen</button>
+        <button id="reset">Reset View</button>
+      </div>
+
+      <div class="row">
+        <button id="setOrigin" class="primary">Set Origin</button>
+        <button id="clearPoints" class="danger">Clear Points</button>
+        <button id="exportCsv">Export CSV</button>
+      </div>
+
+      <div class="kv">
+        <div class="card">
+          <div class="label">当前模式</div>
+          <div class="value" id="mode">Pick Points</div>
+        </div>
+        <div class="card">
+          <div class="label">缩放</div>
+          <div class="value" id="zoomVal">1.00×</div>
+        </div>
+      </div>
+
+      <div class="kv">
+        <div class="card">
+          <div class="label">原点 (image px)</div>
+          <div class="value mono" id="originVal">(0, 0)</div>
+        </div>
+        <div class="card">
+          <div class="label">鼠标坐标 (X, Y)</div>
+          <div class="value mono" id="hoverVal">—</div>
+        </div>
+      </div>
+
+      <div class="points">
+        <h2>Points</h2>
+        <div class="tiny">坐标单位：px（相对原点）。点击表格行可定位点。</div>
+        <table id="pointsTable">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>X</th>
+              <th>Y</th>
+              <th>imgX</th>
+              <th>imgY</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+
+      <div class="tiny" style="margin-top:12px; line-height:1.5;">
+        操作：<br/>
+        • 滚轮缩放（鼠标位置为中心）<br/>
+        • 按住左键拖动平移<br/>
+        • 点图：添加点（或设置原点）<br/>
+      </div>
+    </aside>
+
+    <main class="canvasWrap">
+      <canvas id="c"></canvas>
+      <div class="hint">
+        <b>提示</b>：如果你需要“更精准”，先放大（滚轮），再点选点。<br/>
+        坐标系：X 向右为正，Y 向上为正（数学坐标系）。
+      </div>
+    </main>
+  </div>
+
+<script>
+(() => {
+  const canvas = document.getElementById('c');
+  const ctx = canvas.getContext('2d');
+
+  const elFile = document.getElementById('file');
+  const elFit = document.getElementById('fit');
+  const elReset = document.getElementById('reset');
+  const elSetOrigin = document.getElementById('setOrigin');
+  const elClearPoints = document.getElementById('clearPoints');
+  const elExportCsv = document.getElementById('exportCsv');
+
+  const elMode = document.getElementById('mode');
+  const elZoomVal = document.getElementById('zoomVal');
+  const elOriginVal = document.getElementById('originVal');
+  const elHoverVal = document.getElementById('hoverVal');
+
+  const table = document.getElementById('pointsTable');
+  const tbody = table.querySelector('tbody');
+
+  // State
+  let img = null;
+  let imgW = 0, imgH = 0;
+
+  // View transform: screen = (image * scale) + offset
+  let scale = 1;
+  let offsetX = 0;
+  let offsetY = 0;
+
+  // Origin in image coordinates (pixels, top-left is (0,0))
+  let origin = { x: 0, y: 0 };
+
+  // Interaction
+  let isPanning = false;
+  let lastMouse = { x: 0, y: 0 };
+  let mode = 'pick'; // 'pick' | 'origin'
+  let hoverImgPt = null;
+
+  // Points stored in image coords + computed XY (relative to origin, y-up)
+  const points = []; // { imgX, imgY, X, Y }
+
+  // Resize canvas to fill
+  function resize() {
+    const rect = canvas.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = Math.max(2, Math.floor(rect.width * dpr));
+    canvas.height = Math.max(2, Math.floor(rect.height * dpr));
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0); // draw in CSS pixels
+    draw();
+  }
+  window.addEventListener('resize', resize);
+
+  // Helpers
+  function screenToImage(sx, sy) {
+    // sx,sy in CSS pixels relative to canvas top-left
+    const ix = (sx - offsetX) / scale;
+    const iy = (sy - offsetY) / scale;
+    return { x: ix, y: iy };
+  }
+
+  function imageToScreen(ix, iy) {
+    return { x: ix * scale + offsetX, y: iy * scale + offsetY };
+  }
+
+  function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
+
+  function setMode(next) {
+    mode = next;
+    elMode.textContent = (mode === 'origin') ? 'Set Origin' : 'Pick Points';
+    canvas.style.cursor = (mode === 'origin') ? 'crosshair' : 'crosshair';
+  }
+
+  function setZoomText() {
+    elZoomVal.textContent = `${scale.toFixed(2)}×`;
+  }
+
+  function setOriginText() {
+    elOriginVal.textContent = `(${origin.x.toFixed(1)}, ${origin.y.toFixed(1)})`;
+  }
+
+  function computeXY(imgX, imgY) {
+    // X: right positive; Y: up positive (so invert image y direction)
+    const X = imgX - origin.x;
+    const Y = -(imgY - origin.y);
+    return { X, Y };
+  }
+
+  function withinImage(p) {
+    return p.x >= 0 && p.y >= 0 && p.x <= imgW && p.y <= imgH;
+  }
+
+  // Fit image to canvas
+  function fitToScreen() {
+    if (!img) return;
+    const rect = canvas.getBoundingClientRect();
+    const cw = rect.width, ch = rect.height;
+    const pad = 40;
+    const sx = (cw - pad) / imgW;
+    const sy = (ch - pad) / imgH;
+    scale = Math.max(0.05, Math.min(sx, sy));
+    // center
+    offsetX = (cw - imgW * scale) / 2;
+    offsetY = (ch - imgH * scale) / 2;
+    setZoomText();
+    draw();
+  }
+
+  function resetView() {
+    scale = 1;
+    offsetX = 20;
+    offsetY = 20;
+    setZoomText();
+    draw();
+  }
+
+  // Draw axes (at origin) + ticks
+  function drawAxes() {
+    // origin in screen coords
+    const o = imageToScreen(origin.x, origin.y);
+
+    ctx.save();
+    ctx.lineWidth = 1;
+
+    // axes lines
+    ctx.strokeStyle = 'rgba(106,166,255,0.95)';
+    ctx.beginPath();
+    // X axis (right)
+    ctx.moveTo(o.x, o.y);
+    ctx.lineTo(o.x + 200, o.y);
+    // Y axis (up)
+    ctx.moveTo(o.x, o.y);
+    ctx.lineTo(o.x, o.y - 200);
+    ctx.stroke();
+
+    // Arrowheads
+    ctx.fillStyle = 'rgba(106,166,255,0.95)';
+    // X arrow
+    ctx.beginPath();
+    ctx.moveTo(o.x + 200, o.y);
+    ctx.lineTo(o.x + 190, o.y - 5);
+    ctx.lineTo(o.x + 190, o.y + 5);
+    ctx.closePath();
+    ctx.fill();
+    // Y arrow
+    ctx.beginPath();
+    ctx.moveTo(o.x, o.y - 200);
+    ctx.lineTo(o.x - 5, o.y - 190);
+    ctx.lineTo(o.x + 5, o.y - 190);
+    ctx.closePath();
+    ctx.fill();
+
+    // ticks (every 50px in screen space) for readability
+    ctx.strokeStyle = 'rgba(231,238,252,0.55)';
+    ctx.fillStyle = 'rgba(231,238,252,0.8)';
+    ctx.font = '12px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace';
+
+    const tickScreen = 50;
+    for (let i = 1; i <= 4; i++) {
+      // X ticks
+      const tx = o.x + i * tickScreen;
+      ctx.beginPath();
+      ctx.moveTo(tx, o.y - 4);
+      ctx.lineTo(tx, o.y + 4);
+      ctx.stroke();
+      ctx.fillText(`${(i * tickScreen / scale).toFixed(0)}`, tx - 8, o.y + 18);
+
+      // Y ticks (up)
+      const ty = o.y - i * tickScreen;
+      ctx.beginPath();
+      ctx.moveTo(o.x - 4, ty);
+      ctx.lineTo(o.x + 4, ty);
+      ctx.stroke();
+      ctx.fillText(`${(i * tickScreen / scale).toFixed(0)}`, o.x + 8, ty + 4);
+    }
+
+    // origin label
+    ctx.fillStyle = 'rgba(231,238,252,0.9)';
+    ctx.fillText('O', o.x + 6, o.y - 6);
+
+    ctx.restore();
+  }
+
+  function drawPoints() {
+    ctx.save();
+    for (let i = 0; i < points.length; i++) {
+      const p = points[i];
+      const s = imageToScreen(p.imgX, p.imgY);
+
+      // cross marker
+      ctx.strokeStyle = 'rgba(255,106,106,0.95)';
+      ctx.lineWidth = 2;
+      const r = 6;
+      ctx.beginPath();
+      ctx.moveTo(s.x - r, s.y);
+      ctx.lineTo(s.x + r, s.y);
+      ctx.moveTo(s.x, s.y - r);
+      ctx.lineTo(s.x, s.y + r);
+      ctx.stroke();
+
+      // index label
+      ctx.fillStyle = 'rgba(255,255,255,0.9)';
+      ctx.font = '12px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace';
+      ctx.fillText(`#${i+1}`, s.x + 8, s.y - 8);
+    }
+    ctx.restore();
+  }
+
+  function drawHover() {
+    if (!hoverImgPt || !img) return;
+    if (!withinImage(hoverImgPt)) return;
+
+    const s = imageToScreen(hoverImgPt.x, hoverImgPt.y);
+    ctx.save();
+    ctx.strokeStyle = 'rgba(231,238,252,0.5)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4,4]);
+    ctx.beginPath();
+    // crosshair lines
+    ctx.moveTo(s.x, 0);
+    ctx.lineTo(s.x, canvas.getBoundingClientRect().height);
+    ctx.moveTo(0, s.y);
+    ctx.lineTo(canvas.getBoundingClientRect().width, s.y);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.restore();
+  }
+
+  function draw() {
+    const rect = canvas.getBoundingClientRect();
+    const w = rect.width, h = rect.height;
+
+    ctx.clearRect(0, 0, w, h);
+
+    // background grid (optional subtle)
+    ctx.save();
+    ctx.strokeStyle = 'rgba(255,255,255,0.04)';
+    ctx.lineWidth = 1;
+    for (let x = 0; x < w; x += 40) {
+      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
+    }
+    for (let y = 0; y < h; y += 40) {
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
+    }
+    ctx.restore();
+
+    if (img) {
+      // Draw image with transform
+      ctx.save();
+      ctx.translate(offsetX, offsetY);
+      ctx.scale(scale, scale);
+      ctx.drawImage(img, 0, 0);
+      ctx.restore();
+
+      drawAxes();
+      drawPoints();
+      drawHover();
+    } else {
+      ctx.save();
+      ctx.fillStyle = 'rgba(231,238,252,0.7)';
+      ctx.font = '16px system-ui, -apple-system, Segoe UI, Roboto';
+      ctx.fillText('上传一张图片开始使用', 24, 48);
+      ctx.restore();
+    }
+
+    setZoomText();
+    setOriginText();
+  }
+
+  function rebuildTable() {
+    tbody.innerHTML = '';
+    points.forEach((p, i) => {
+      const tr = document.createElement('tr');
+
+      const tdIdx = document.createElement('td');
+      tdIdx.textContent = String(i + 1);
+      tr.appendChild(tdIdx);
+
+      const tdX = document.createElement('td');
+      tdX.textContent = p.X.toFixed(2);
+      tdX.className = 'mono';
+      tr.appendChild(tdX);
+
+      const tdY = document.createElement('td');
+      tdY.textContent = p.Y.toFixed(2);
+      tdY.className = 'mono';
+      tr.appendChild(tdY);
+
+      const tdIX = document.createElement('td');
+      tdIX.textContent = p.imgX.toFixed(1);
+      tdIX.className = 'mono';
+      tr.appendChild(tdIX);
+
+      const tdIY = document.createElement('td');
+      tdIY.textContent = p.imgY.toFixed(1);
+      tdIY.className = 'mono';
+      tr.appendChild(tdIY);
+
+      const tdBtn = document.createElement('td');
+      const del = document.createElement('button');
+      del.textContent = 'Del';
+      del.className = 'danger';
+      del.style.padding = '6px 10px';
+      del.style.borderRadius = '10px';
+      del.addEventListener('click', (e) => {
+        e.stopPropagation();
+        points.splice(i, 1);
+        rebuildTable();
+        draw();
+      });
+      tdBtn.appendChild(del);
+      tr.appendChild(tdBtn);
+
+      tr.style.cursor = 'pointer';
+      tr.addEventListener('click', () => {
+        // center view on this point
+        const rect = canvas.getBoundingClientRect();
+        const target = imageToScreen(p.imgX, p.imgY);
+        offsetX += (rect.width / 2 - target.x);
+        offsetY += (rect.height / 2 - target.y);
+        draw();
+      });
+
+      tbody.appendChild(tr);
+    });
+  }
+
+  // Events
+  elFile.addEventListener('change', async (e) => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+
+    const url = URL.createObjectURL(f);
+    const image = new Image();
+    image.onload = () => {
+      img = image;
+      imgW = img.naturalWidth;
+      imgH = img.naturalHeight;
+
+      // set default origin to top-left (0,0)
+      origin = { x: 0, y: 0 };
+      points.length = 0;
+      rebuildTable();
+
+      fitToScreen();
+      URL.revokeObjectURL(url);
+    };
+    image.src = url;
+  });
+
+  elFit.addEventListener('click', fitToScreen);
+  elReset.addEventListener('click', resetView);
+
+  elSetOrigin.addEventListener('click', () => {
+    if (!img) return;
+    setMode('origin');
+  });
+
+  elClearPoints.addEventListener('click', () => {
+    points.length = 0;
+    rebuildTable();
+    draw();
+  });
+
+  elExportCsv.addEventListener('click', () => {
+    if (!points.length) return;
+
+    const header = 'index,X,Y,imgX,imgY\n';
+    const rows = points.map((p, i) =>
+      `${i+1},${p.X.toFixed(6)},${p.Y.toFixed(6)},${p.imgX.toFixed(6)},${p.imgY.toFixed(6)}`
+    ).join('\n');
+
+    const blob = new Blob([header + rows], { type: 'text/csv;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'points.csv';
+    a.click();
+    URL.revokeObjectURL(a.href);
+  });
+
+  canvas.addEventListener('mousedown', (e) => {
+    if (!img) return;
+    isPanning = true;
+    lastMouse = { x: e.offsetX, y: e.offsetY };
+  });
+
+  window.addEventListener('mouseup', () => {
+    isPanning = false;
+  });
+
+  canvas.addEventListener('mousemove', (e) => {
+    if (!img) return;
+
+    // Hover readout
+    const p = screenToImage(e.offsetX, e.offsetY);
+    hoverImgPt = p;
+
+    if (withinImage(p)) {
+      const { X, Y } = computeXY(p.x, p.y);
+      elHoverVal.textContent = `(${X.toFixed(2)}, ${Y.toFixed(2)})`;
+    } else {
+      elHoverVal.textContent = '—';
+    }
+
+    // Pan
+    if (isPanning && e.buttons === 1) {
+      const dx = e.offsetX - lastMouse.x;
+      const dy = e.offsetY - lastMouse.y;
+      offsetX += dx;
+      offsetY += dy;
+      lastMouse = { x: e.offsetX, y: e.offsetY };
+      draw();
+      return;
+    }
+
+    draw();
+  });
+
+  canvas.addEventListener('click', (e) => {
+    if (!img) return;
+
+    const p = screenToImage(e.offsetX, e.offsetY);
+    if (!withinImage(p)) return;
+
+    if (mode === 'origin') {
+      origin = { x: p.x, y: p.y };
+      setMode('pick');
+      draw();
+      return;
+    }
+
+    // add point
+    const { X, Y } = computeXY(p.x, p.y);
+    points.push({ imgX: p.x, imgY: p.y, X, Y });
+    rebuildTable();
+    draw();
+  });
+
+  // Zoom with wheel (zoom to cursor)
+  canvas.addEventListener('wheel', (e) => {
+    if (!img) return;
+    e.preventDefault();
+
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.offsetX;
+    const my = e.offsetY;
+
+    const before = screenToImage(mx, my);
+
+    const zoomFactor = (e.deltaY < 0) ? 1.12 : 1 / 1.12;
+    const nextScale = clamp(scale * zoomFactor, 0.05, 50);
+
+    // keep point under cursor stable
+    scale = nextScale;
+    const after = imageToScreen(before.x, before.y);
+    offsetX += (mx - after.x);
+    offsetY += (my - after.y);
+
+    setZoomText();
+    draw();
+  }, { passive: false });
+
+  // Init
+  setMode('pick');
+  resize();
+})();
+</script>
+</body>
+</html>

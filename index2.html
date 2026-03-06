@@ -3,58 +3,51 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Na2O-B2O3-SiO2 Glass Calculator</title>
+  <title>Na2O-B2O3-SiO2 APF/RUPF Calculator</title>
   <style>
     body{
       font-family: Arial, sans-serif;
-      margin: 40px;
+      margin:40px;
       background:#f4f6f8;
       color:#111;
     }
-
     .container{
-      background:white;
+      background:#fff;
       padding:30px;
       border-radius:12px;
-      max-width:900px;
+      max-width:980px;
       box-shadow:0 4px 20px rgba(0,0,0,0.10);
     }
-
     h1{
       margin-top:0;
-      margin-bottom:20px;
+      margin-bottom:10px;
       font-size:2.2rem;
     }
-
     p{
-      font-size:1.1rem;
-      margin-bottom:20px;
+      margin:8px 0 14px 0;
+      line-height:1.5;
     }
-
     table{
       border-collapse:collapse;
-      margin-top:20px;
+      margin-top:16px;
       width:100%;
-      max-width:760px;
+      max-width:900px;
     }
-
     td, th{
       border:1px solid #aaa;
-      padding:10px 14px;
+      padding:10px 12px;
       text-align:center;
       font-size:1rem;
     }
-
     input{
       width:110px;
       padding:8px;
       font-size:1rem;
       box-sizing:border-box;
     }
-
     button{
       margin-top:16px;
-      padding:12px 24px;
+      padding:12px 22px;
       background:#2f6ed6;
       color:white;
       border:none;
@@ -62,19 +55,15 @@
       cursor:pointer;
       font-size:1rem;
     }
-
     button:hover{
       background:#2459ae;
     }
-
     .note{
       margin-top:18px;
       font-size:0.95rem;
       color:#444;
-      max-width:760px;
-      line-height:1.5;
+      line-height:1.55;
     }
-
     .error{
       color:#b00020;
       font-weight:bold;
@@ -84,19 +73,27 @@
 </head>
 <body>
   <div class="container">
-    <h1>Na₂O – B₂O₃ – SiO₂ Glass Calculator</h1>
-    <p>True calculation version (not lookup-table version)</p>
+    <h1>Na₂O – B₂O₃ – SiO₂ APF / RUPF Calculator</h1>
+    <p>
+      Paper-based version using the framework from
+      <em>Revisiting the Makishima–Mackenzie model for predicting the young's modulus of oxide glasses</em>.
+    </p>
+    <p>
+      Inputs: x, y, density, and N4 = fraction of boron that is BO4.
+    </p>
 
     <table>
       <tr>
-        <th>x (B₂O₃ fraction)</th>
+        <th>x (B₂O₃ fraction in [xB₂O₃ + (1-x)SiO₂])</th>
         <th>y (Na₂O fraction)</th>
         <th>Density (g/cm³)</th>
+        <th>N4 = B[4] / B(total)</th>
       </tr>
       <tr>
         <td><input id="x" type="number" step="any" value="0.3"></td>
         <td><input id="y" type="number" step="any" value="0.33"></td>
         <td><input id="rho" type="number" step="any" value="2.52"></td>
+        <td><input id="n4" type="number" step="any" value="0.463"></td>
       </tr>
     </table>
 
@@ -111,55 +108,38 @@
         <th>Property</th>
         <th>Value</th>
       </tr>
-      <tr>
-        <td>Molar Mass (g/mol)</td>
-        <td id="M"></td>
-      </tr>
-      <tr>
-        <td>Molar Volume (cm³/mol)</td>
-        <td id="Vm"></td>
-      </tr>
-      <tr>
-        <td>Na atoms</td>
-        <td id="nNa"></td>
-      </tr>
-      <tr>
-        <td>B atoms</td>
-        <td id="nB"></td>
-      </tr>
-      <tr>
-        <td>Si atoms</td>
-        <td id="nSi"></td>
-      </tr>
-      <tr>
-        <td>O atoms</td>
-        <td id="nO"></td>
-      </tr>
-      <tr>
-        <td>Total ionic volume (cm³/mol)</td>
-        <td id="Vion"></td>
-      </tr>
-      <tr>
-        <td>APF</td>
-        <td id="APF"></td>
-      </tr>
-      <tr>
-        <td>RUPF</td>
-        <td id="RUPF"></td>
-      </tr>
+      <tr><td>Molar Mass (g/mol)</td><td id="M"></td></tr>
+      <tr><td>Molar Volume (cm³/mol)</td><td id="Vm"></td></tr>
+
+      <tr><td>Na atoms</td><td id="NNa"></td></tr>
+      <tr><td>Total B atoms</td><td id="NB"></td></tr>
+      <tr><td>B[3] atoms</td><td id="NB3"></td></tr>
+      <tr><td>B[4] atoms</td><td id="NB4"></td></tr>
+      <tr><td>Si atoms</td><td id="NSi"></td></tr>
+      <tr><td>O atoms</td><td id="NO"></td></tr>
+      <tr><td>Total atoms</td><td id="NT"></td></tr>
+
+      <tr><td>Total atomic number density ρ (atoms/Å³)</td><td id="rhoAtom"></td></tr>
+      <tr><td>Mean touching oxygen radius r̄<sub>O</sub> (Å)</td><td id="rOmean"></td></tr>
+      <tr><td>Na effective radius for RUPF (Å)</td><td id="rNaRUPF"></td></tr>
+
+      <tr><td>η<sub>O</sub></td><td id="etaO"></td></tr>
+      <tr><td>η<sub>interstitial</sub></td><td id="etaInt"></td></tr>
+      <tr><td>η<sub>M</sub></td><td id="etaM"></td></tr>
+      <tr><td><strong>RUPF</strong></td><td id="RUPF"></td></tr>
+      <tr><td><strong>APF</strong></td><td id="APF"></td></tr>
     </table>
 
     <div class="note">
-      Current radii used in this version:<br>
-      Na⁺ = 1.02 Å, B³⁺ = 0.11 Å, Si⁴⁺ = 0.26 Å, O²⁻ = 1.40 Å.<br>
-      If your Excel uses different radii, B coordination fractions, or a different RUPF relation,
-      the numbers will differ slightly. This page is a real formula-based calculator, not a table lookup.
+      This implementation follows the paper’s equations: APF uses Eq. (2), while RUPF uses Eq. (5)–(12).  
+      B is split into BO₃ and BO₄ using the input N4.  
+      If you later give me the exact Yun-Bray equation you want to use, I can remove the manual N4 input and compute N4 directly from x and y.
     </div>
   </div>
 
   <script>
-    function sphereVolumeA3(r){
-      return (4 / 3) * Math.PI * Math.pow(r, 3);
+    function sphereVolume(r){
+      return (4.0 / 3.0) * Math.PI * Math.pow(r, 3);
     }
 
     function setText(id, value){
@@ -167,109 +147,191 @@
     }
 
     function clearResults(){
-      const ids = ["M", "Vm", "nNa", "nB", "nSi", "nO", "Vion", "APF", "RUPF"];
-      for (const id of ids){
-        setText(id, "");
-      }
+      const ids = [
+        "M","Vm","NNa","NB","NB3","NB4","NSi","NO","NT",
+        "rhoAtom","rOmean","rNaRUPF","etaO","etaInt","etaM","RUPF","APF"
+      ];
+      for (const id of ids) setText(id, "");
     }
 
     function calculate(){
+      clearResults();
       const errorBox = document.getElementById("error");
       errorBox.textContent = "";
-      clearResults();
 
-      const x = parseFloat(document.getElementById("x").value);
-      const y = parseFloat(document.getElementById("y").value);
+      const x   = parseFloat(document.getElementById("x").value);
+      const y   = parseFloat(document.getElementById("y").value);
       const rho = parseFloat(document.getElementById("rho").value);
+      const n4  = parseFloat(document.getElementById("n4").value);
 
-      if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(rho)){
-        errorBox.textContent = "Please enter valid numbers for x, y, and density.";
+      if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(rho) || !Number.isFinite(n4)) {
+        errorBox.textContent = "Please enter valid numbers for x, y, density, and N4.";
         return;
       }
-
-      if (x < 0 || x > 1){
+      if (x < 0 || x > 1) {
         errorBox.textContent = "x must be between 0 and 1.";
         return;
       }
-
-      if (y < 0 || y > 1){
+      if (y < 0 || y > 1) {
         errorBox.textContent = "y must be between 0 and 1.";
         return;
       }
-
-      if (rho <= 0){
-        errorBox.textContent = "Density must be greater than 0.";
+      if (rho <= 0) {
+        errorBox.textContent = "Density must be > 0.";
+        return;
+      }
+      if (n4 < 0 || n4 > 1) {
+        errorBox.textContent = "N4 must be between 0 and 1.";
         return;
       }
 
-      // Molar masses (g/mol)
+      // ===== Composition basis =====
+      // y Na2O + (1-y)[x B2O3 + (1-x) SiO2]
+
+      // oxide molar masses (g/mol)
       const M_Na2O = 61.98;
       const M_B2O3 = 69.62;
       const M_SiO2 = 60.08;
 
-      // Avogadro number
-      const NA = 6.02214076e23;
+      // elemental atomic masses (g/mol)
+      const A_Na = 22.98976928;
+      const A_B  = 10.81;
+      const A_Si = 28.085;
+      const A_O  = 15.999;
 
-      // Ionic radii (Å)
-      const rNa = 1.02;
-      const rB  = 0.11;
-      const rSi = 0.26;
-      const rO  = 1.40;
-
-      // Composition:
-      // y Na2O + (1-y)[x B2O3 + (1-x) SiO2]
-
-      // Molar mass
+      // molecule-based molar mass of glass
       const M =
         y * M_Na2O +
         (1 - y) * (x * M_B2O3 + (1 - x) * M_SiO2);
 
-      // Molar volume
       const Vm = M / rho;
 
-      // Number of atoms per mole of glass batch expression
-      const nNa = 2 * y;
-      const nB  = 2 * x * (1 - y);
-      const nSi = (1 - x) * (1 - y);
-      const nO  = y + 3 * x * (1 - y) + 2 * (1 - x) * (1 - y);
+      // atoms per one composition unit
+      const NNa = 2 * y;
+      const NB  = 2 * x * (1 - y);
+      const NSi = (1 - x) * (1 - y);
+      const NO  = y + 3 * x * (1 - y) + 2 * (1 - x) * (1 - y);
+      const NT  = NNa + NB + NSi + NO;
 
-      // Ionic volumes in Å^3
-      const vNa = sphereVolumeA3(rNa);
-      const vB  = sphereVolumeA3(rB);
-      const vSi = sphereVolumeA3(rSi);
-      const vO  = sphereVolumeA3(rO);
+      // split B into B[3] and B[4]
+      const NB4 = NB * n4;
+      const NB3 = NB * (1 - n4);
 
-      // Total ionic volume in Å^3 per formula expression
-      let VionA3 =
-        nNa * vNa +
-        nB  * vB  +
-        nSi * vSi +
-        nO  * vO;
+      // atomic fractions
+      const CNa = NNa / NT;
+      const CB3 = NB3 / NT;
+      const CB4 = NB4 / NT;
+      const CBSum = NB / NT;
+      const CSi = NSi / NT;
+      const CO  = NO / NT;
 
-      // Convert Å^3 * mol^-1 to cm^3/mol
-      // 1 Å^3 = 1e-24 cm^3
-      const Vion = VionA3 * 1e-24 * NA;
+      // ===== APF from Eq. (2) =====
+      // eta_APF = rho_atom * sum(V_i * C_i)
+      // rho_atom = 0.6022 * rho_mass / sum(M_i * C_i)
 
-      // APF
-      const APF = Vion / Vm;
+      const avgAtomicMass =
+        CNa * A_Na +
+        CBSum * A_B +
+        CSi * A_Si +
+        CO  * A_O;
 
-      // RUPF
-      // Current simple correction form
-      const RUPF = APF + 0.0032;
+      const rhoAtom = 0.6022 * rho / avgAtomicMass; // atoms / Å^3
 
-      // Output
+      // Pauling radii from Table 2
+      const rNa_APF = 1.02;
+      const rB3_APF = 0.01;
+      const rB4_APF = 0.11;
+      const rSi_APF = 0.26;
+      const rO_APF  = 1.35;
+
+      const VNa_APF = sphereVolume(rNa_APF);
+      const VB3_APF = sphereVolume(rB3_APF);
+      const VB4_APF = sphereVolume(rB4_APF);
+      const VSi_APF = sphereVolume(rSi_APF);
+      const VO_APF  = sphereVolume(rO_APF);
+
+      const APF =
+        rhoAtom * (
+          CNa * VNa_APF +
+          CB3 * VB3_APF +
+          CB4 * VB4_APF +
+          CSi * VSi_APF +
+          CO  * VO_APF
+        );
+
+      // ===== RUPF from Eq. (5)–(12) =====
+
+      // touching oxygen radii from Table 2
+      const rO_B3 = 1.178;
+      const rO_B4 = 1.207;
+      const rO_Si = 1.306;
+
+      // interstitial packing fractions from Table 2
+      const hInt_B3 = 0.3952;
+      const hInt_B4 = 0.26;
+      const hInt_Si = 0.26;
+
+      // Eq. (7): mean oxide-ion volume of mixed polyhedra
+      const numeratorVO =
+        3 * CB3 * Math.pow(rO_B3, 3) +
+        4 * CB4 * Math.pow(rO_B4, 3) +
+        4 * CSi * Math.pow(rO_Si, 3);
+
+      const denominatorVO =
+        3 * CB3 +
+        4 * CB4 +
+        4 * CSi;
+
+      const VO_mean = (4.0 / 3.0) * Math.PI * (numeratorVO / denominatorVO);
+
+      // Eq. (12): mean oxide-ion radius
+      const rOmean = Math.pow((VO_mean * 3.0) / (4.0 * Math.PI), 1.0 / 3.0);
+
+      // Eq. (6): eta_O = VO * rho_O
+      const rhoO = rhoAtom * CO;
+      const etaO = VO_mean * rhoO;
+
+      // Eq. (9): interstitial contribution
+      // eta_int = sum[ h_int/(1-h_int) * rhoAtom * (4/3 pi) * C_A[n] * r_O,A[n]^3 ]
+      const etaInt =
+        (hInt_B3 / (1 - hInt_B3)) * rhoAtom * (4.0 / 3.0) * Math.PI * CB3 * Math.pow(rO_B3, 3) +
+        (hInt_B4 / (1 - hInt_B4)) * rhoAtom * (4.0 / 3.0) * Math.PI * CB4 * Math.pow(rO_B4, 3) +
+        (hInt_Si / (1 - hInt_Si)) * rhoAtom * (4.0 / 3.0) * Math.PI * CSi * Math.pow(rO_Si, 3);
+
+      // Eq. (11): r_M = r_M-O - r̄_O
+      // Na–O bond length from Table 2 = 2.37 Å
+      const rNaRUPF = 2.37 - rOmean;
+
+      // Eq. (10): eta_M = V_M * rho_M
+      const VNa_RUPF = sphereVolume(rNaRUPF);
+      const rhoNa = rhoAtom * CNa;
+      const etaM = VNa_RUPF * rhoNa;
+
+      const RUPF = etaO + etaInt + etaM;
+
+      // ===== output =====
       setText("M", M.toFixed(3));
       setText("Vm", Vm.toFixed(3));
-      setText("nNa", nNa.toFixed(3));
-      setText("nB", nB.toFixed(3));
-      setText("nSi", nSi.toFixed(3));
-      setText("nO", nO.toFixed(3));
-      setText("Vion", Vion.toFixed(3));
-      setText("APF", APF.toFixed(4));
+
+      setText("NNa", NNa.toFixed(3));
+      setText("NB", NB.toFixed(3));
+      setText("NB3", NB3.toFixed(3));
+      setText("NB4", NB4.toFixed(3));
+      setText("NSi", NSi.toFixed(3));
+      setText("NO", NO.toFixed(3));
+      setText("NT", NT.toFixed(3));
+
+      setText("rhoAtom", rhoAtom.toFixed(5));
+      setText("rOmean", rOmean.toFixed(4));
+      setText("rNaRUPF", rNaRUPF.toFixed(4));
+
+      setText("etaO", etaO.toFixed(4));
+      setText("etaInt", etaInt.toFixed(4));
+      setText("etaM", etaM.toFixed(4));
       setText("RUPF", RUPF.toFixed(4));
+      setText("APF", APF.toFixed(4));
     }
 
-    // Auto-run once on load
     calculate();
   </script>
 </body>

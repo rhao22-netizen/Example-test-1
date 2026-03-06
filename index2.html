@@ -1,41 +1,39 @@
 <!DOCTYPE html>
 <html>
-
 <head>
 
 <meta charset="UTF-8">
-<title>Glass Structure Calculator (MM Model)</title>
+<title>Glass Packing Calculator</title>
 
 <style>
 
 body{
 font-family:Arial;
 margin:40px;
-background:#f5f6fa;
+background:#f4f6f8;
 }
 
 .container{
 background:white;
 padding:30px;
 border-radius:10px;
-max-width:900px;
+max-width:700px;
 box-shadow:0 4px 20px rgba(0,0,0,0.1);
 }
 
 table{
 border-collapse:collapse;
 margin-top:20px;
-width:100%;
 }
 
 td,th{
 border:1px solid #aaa;
-padding:6px;
+padding:8px 12px;
 text-align:center;
 }
 
 input{
-width:80px;
+width:90px;
 padding:4px;
 }
 
@@ -57,25 +55,60 @@ cursor:pointer;
 
 <div class="container">
 
-<h1>Na₂O–B₂O₃–SiO₂ Glass Calculator</h1>
+<h2>Na₂O – B₂O₃ – SiO₂ Glass Calculator</h2>
 
 <p>Makishima–Mackenzie Model</p>
 
-<label>Na₂O fraction (y)</label>
-<input id="y" value="0.33">
-
-<button onclick="generate()">Generate Table</button>
-
-<table id="table">
+<table>
 
 <tr>
-<th>x</th>
-<th>Density</th>
-<th>Molar Mass</th>
-<th>Molar Volume</th>
-<th>Packing Volume</th>
-<th>APF</th>
-<th>RUPF</th>
+<th>x (B₂O₃ fraction)</th>
+<th>y (Na₂O fraction)</th>
+<th>Density (g/cm³)</th>
+</tr>
+
+<tr>
+<td><input id="x" value="0.3"></td>
+<td><input id="y" value="0.33"></td>
+<td><input id="rho" value="2.52"></td>
+</tr>
+
+</table>
+
+<button onclick="calculate()">Calculate</button>
+
+<h3>Results</h3>
+
+<table>
+
+<tr>
+<th>Property</th>
+<th>Value</th>
+</tr>
+
+<tr>
+<td>Molar Mass (g/mol)</td>
+<td id="M"></td>
+</tr>
+
+<tr>
+<td>Molar Volume (cm³/mol)</td>
+<td id="Vm"></td>
+</tr>
+
+<tr>
+<td>Packing Volume</td>
+<td id="Vt"></td>
+</tr>
+
+<tr>
+<td>APF</td>
+<td id="APF"></td>
+</tr>
+
+<tr>
+<td>RUPF</td>
+<td id="RUPF"></td>
 </tr>
 
 </table>
@@ -84,118 +117,63 @@ cursor:pointer;
 
 <script>
 
-function generate(){
+function calculate(){
 
+let x=parseFloat(document.getElementById("x").value)
 let y=parseFloat(document.getElementById("y").value)
+let rho=parseFloat(document.getElementById("rho").value)
+
+
+// molar masses
 
 const M_Na2O=61.98
 const M_B2O3=69.62
 const M_SiO2=60.08
 
-const V_Na2O=11.2
-const V_B2O3=13.3
-const V_SiO2=26.9
+
+// molar mass
+
+let M =
+y*M_Na2O +
+(1-y)*(x*M_B2O3 + (1-x)*M_SiO2)
 
 
-// density table (replace with your real data)
+// molar volume
 
-const densityTable={
-
-0.0:2.20,
-0.1:2.30,
-0.2:2.40,
-0.3:2.52,
-0.4:2.60,
-0.5:2.66,
-0.6:2.70,
-0.7:2.73,
-0.8:2.75,
-0.9:2.77,
-1.0:2.78
-
-}
+let Vm = M/rho
 
 
-// interpolation
+// packing volumes (Makishima–Mackenzie corrected)
 
-function density(x){
-
-let keys=Object.keys(densityTable).map(Number)
-
-for(let i=0;i<keys.length-1;i++){
-
-let x1=keys[i]
-let x2=keys[i+1]
-
-if(x>=x1 && x<=x2){
-
-let y1=densityTable[x1]
-let y2=densityTable[x2]
-
-return y1+(y2-y1)*(x-x1)/(x2-x1)
-
-}
-
-}
-
-return densityTable[keys[keys.length-1]]
-
-}
+const V_Na2O = 11.2
+const V_B2O3 = 12.2
+const V_SiO2 = 14.6
 
 
-let table=document.getElementById("table")
+// total packing volume
 
-table.innerHTML=
-
-`<tr>
-<th>x</th>
-<th>Density</th>
-<th>Molar Mass</th>
-<th>Molar Volume</th>
-<th>Packing Volume</th>
-<th>APF</th>
-<th>RUPF</th>
-</tr>`
+let Vt =
+y*V_Na2O +
+(1-y)*(x*V_B2O3 + (1-x)*V_SiO2)
 
 
-for(let x=0;x<=1.0001;x+=0.05){
+// APF
 
-let rho=density(x)
-
-let M=
-
-y*M_Na2O+
-(1-y)*(x*M_B2O3+(1-x)*M_SiO2)
-
-let Vm=M/rho
-
-let Vt=
-
-y*V_Na2O+
-(1-y)*(x*V_B2O3+(1-x)*V_SiO2)
-
-let APF=Vt/Vm
-
-let RUPF=APF+0.0032
+let APF = Vt / Vm
 
 
-table.innerHTML+=`
+// RUPF correction
 
-<tr>
+let RUPF = APF + 0.0032
 
-<td>${x.toFixed(2)}</td>
-<td>${rho.toFixed(3)}</td>
-<td>${M.toFixed(3)}</td>
-<td>${Vm.toFixed(3)}</td>
-<td>${Vt.toFixed(3)}</td>
-<td>${APF.toFixed(4)}</td>
-<td>${RUPF.toFixed(4)}</td>
 
-</tr>
+// output
 
-`
-
-}
+document.getElementById("M").innerHTML=M.toFixed(3)
+document.getElementById("Vm").innerHTML=Vm.toFixed(3)
+document.getElementById("Vt").innerHTML=Vt.toFixed(3)
+document.getElementById("APF").innerHTML=APF.toFixed(4)
+document.getElementById("RUPF").innerHTML=RUPF.toFixed(4)
 
 }
 

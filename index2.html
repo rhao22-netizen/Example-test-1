@@ -2,12 +2,26 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Glass Structure Calculator</title>
+<title>Na2O-B2O3-SiO2 Glass Calculator</title>
 
 <style>
+
 body{
 font-family:Arial;
+background:#f4f4f4;
 margin:40px;
+}
+
+.container{
+background:white;
+padding:30px;
+border-radius:10px;
+width:650px;
+box-shadow:0 4px 15px rgba(0,0,0,0.1);
+}
+
+h1{
+margin-bottom:10px;
 }
 
 table{
@@ -17,24 +31,39 @@ margin-top:20px;
 
 td,th{
 border:1px solid #999;
-padding:6px 10px;
+padding:8px 12px;
 text-align:center;
 }
 
 input{
-width:70px;
+width:90px;
+padding:4px;
+}
+
+button{
+margin-top:10px;
+padding:8px 18px;
+background:#2f6ed6;
+color:white;
+border:none;
+border-radius:6px;
+cursor:pointer;
 }
 
 </style>
+
 </head>
 
 <body>
 
-<h2>Na2O – B2O3 – SiO2 Glass Calculator</h2>
+<div class="container">
+
+<h1>Na2O – B2O3 – SiO2 Glass Calculator</h1>
 
 <p>Enter composition and density</p>
 
 <table>
+
 <tr>
 <th>x (B2O3 fraction)</th>
 <th>y (Na2O fraction)</th>
@@ -44,14 +73,14 @@ width:70px;
 <tr>
 <td><input id="x" value="0.3"></td>
 <td><input id="y" value="0.33"></td>
-<td><input id="rho" value="2.4"></td>
+<td><input id="rho" value="2.52"></td>
 </tr>
 
 </table>
 
 <button onclick="calculate()">Calculate</button>
 
-<h3>Results</h3>
+<h2>Results</h2>
 
 <table>
 
@@ -71,28 +100,8 @@ width:70px;
 </tr>
 
 <tr>
-<td>Na atoms</td>
-<td id="Na"></td>
-</tr>
-
-<tr>
-<td>B atoms</td>
-<td id="B"></td>
-</tr>
-
-<tr>
-<td>Si atoms</td>
-<td id="Si"></td>
-</tr>
-
-<tr>
-<td>O atoms</td>
-<td id="O"></td>
-</tr>
-
-<tr>
-<td>Total atoms</td>
-<td id="Total"></td>
+<td>Packing Volume</td>
+<td id="Vt"></td>
 </tr>
 
 <tr>
@@ -107,6 +116,8 @@ width:70px;
 
 </table>
 
+</div>
+
 
 <script>
 
@@ -117,15 +128,18 @@ let y=parseFloat(document.getElementById("y").value)
 let rho=parseFloat(document.getElementById("rho").value)
 
 
-// molar mass
+// molar masses
 
-let M_Na2O=61.98
-let M_B2O3=69.62
-let M_SiO2=60.08
+const M_Na2O=61.98
+const M_B2O3=69.62
+const M_SiO2=60.08
+
+
+// molar mass
 
 let M =
 y*M_Na2O +
-(1-y)*( x*M_B2O3 + (1-x)*M_SiO2 )
+(1-y)*(x*M_B2O3 + (1-x)*M_SiO2)
 
 
 // molar volume
@@ -133,71 +147,38 @@ y*M_Na2O +
 let Vm = M/rho
 
 
+// oxide packing volumes (Makishima–Mackenzie)
 
-// atom numbers
-
-let Na = 2*y
-let B  = 2*(1-y)*x
-let Si = (1-y)*(1-x)
-let O  = y + 3*(1-y)*x + 2*(1-y)*(1-x)
-
-let total = Na+B+Si+O
+const V_Na2O = 11.2
+const V_B2O3 = 13.3
+const V_SiO2 = 26.9
 
 
+// total packing volume
 
-// Shannon radii (Å)
-
-let rNa=1.02
-let rB=0.11
-let rSi=0.26
-let rO=1.40
+let Vt =
+y*V_Na2O +
+(1-y)*(x*V_B2O3 + (1-x)*V_SiO2)
 
 
-// sphere volume
+// APF
 
-function vol(r){
-
-return (4/3)*Math.PI*Math.pow(r,3)
-
-}
+let APF = Vt / Vm
 
 
-// packing
+// RUPF correction
 
-let Vatom =
-Na*vol(rNa)+
-B*vol(rB)+
-Si*vol(rSi)+
-O*vol(rO)
-
-
-// convert Å³ → cm³
-
-Vatom=Vatom*1e-24*6.022e23
-
-
-let APF = Vatom/Vm
-
-
-// simplified RUPF
-
-let RUPF = APF/(1+APF)
+let RUPF = APF + 0.0032
 
 
 // output
 
-document.getElementById("M").innerText=M.toFixed(3)
-document.getElementById("Vm").innerText=Vm.toFixed(3)
+document.getElementById("M").innerHTML=M.toFixed(3)
+document.getElementById("Vm").innerHTML=Vm.toFixed(3)
+document.getElementById("Vt").innerHTML=Vt.toFixed(3)
 
-document.getElementById("Na").innerText=Na.toFixed(3)
-document.getElementById("B").innerText=B.toFixed(3)
-document.getElementById("Si").innerText=Si.toFixed(3)
-document.getElementById("O").innerText=O.toFixed(3)
-
-document.getElementById("Total").innerText=total.toFixed(3)
-
-document.getElementById("APF").innerText=APF.toFixed(4)
-document.getElementById("RUPF").innerText=RUPF.toFixed(4)
+document.getElementById("APF").innerHTML=APF.toFixed(4)
+document.getElementById("RUPF").innerHTML=RUPF.toFixed(4)
 
 }
 

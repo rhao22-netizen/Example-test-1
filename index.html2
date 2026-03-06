@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Glass Structure Calculator</title>
+
+<style>
+body{
+font-family:Arial;
+margin:40px;
+background:#f4f6f8;
+}
+
+.container{
+background:white;
+padding:30px;
+max-width:600px;
+margin:auto;
+border-radius:10px;
+box-shadow:0 4px 10px rgba(0,0,0,0.1);
+}
+
+input{
+width:100%;
+padding:8px;
+margin-top:5px;
+margin-bottom:15px;
+}
+
+button{
+padding:10px 20px;
+background:#2c7be5;
+color:white;
+border:none;
+border-radius:5px;
+}
+
+.result{
+margin-top:20px;
+background:#f2f2f2;
+padding:15px;
+border-radius:5px;
+}
+</style>
+</head>
+
+
+<body>
+
+<div class="container">
+
+<h2>Glass Structure Calculator</h2>
+
+<label>Na2O fraction (y)</label>
+<input id="y" type="number" step="0.01">
+
+<label>B2O3 fraction (x)</label>
+<input id="x" type="number" step="0.01">
+
+<label>Density (g/cm³)</label>
+<input id="rho" type="number" step="0.01">
+
+<button onclick="calculate()">Calculate</button>
+
+<div class="result" id="output"></div>
+
+</div>
+
+<script>
+
+function sphere(r){
+return 4/3*Math.PI*Math.pow(r,3)
+}
+
+function calculate(){
+
+let x=parseFloat(document.getElementById("x").value)
+let y=parseFloat(document.getElementById("y").value)
+let rho=parseFloat(document.getElementById("rho").value)
+
+let Na2O=y
+let B2O3=(1-y)*x
+let SiO2=(1-y)*(1-x)
+
+let R=Na2O/B2O3
+
+let N4
+
+if(R<=0.5){N4=R}
+else if(R<=1){N4=0.5}
+else{N4=1/R}
+
+let N3=1-N4
+
+let B_total=2*B2O3
+let B4=B_total*N4
+
+let O_total=Na2O+3*B2O3+2*SiO2
+
+let NBO=Math.max(0,2*Na2O-B4)
+let BO=O_total-NBO
+
+let M=Na2O*61.98+B2O3*69.62+SiO2*60.09
+let Vm=M/rho
+
+let APF=0.55+0.2*y
+
+document.getElementById("output").innerHTML=
+`
+Composition:<br>
+Na2O=${Na2O.toFixed(3)}<br>
+B2O3=${B2O3.toFixed(3)}<br>
+SiO2=${SiO2.toFixed(3)}<br><br>
+
+B3 fraction = ${N3.toFixed(3)}<br>
+B4 fraction = ${N4.toFixed(3)}<br><br>
+
+NBO = ${NBO.toFixed(3)}<br>
+BO = ${BO.toFixed(3)}<br><br>
+
+Molar Volume = ${Vm.toFixed(3)} cm³/mol<br>
+APF ≈ ${APF.toFixed(3)}
+`
+}
+
+</script>
+
+</body>
+</html>

@@ -1,136 +1,203 @@
 <!DOCTYPE html>
-
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Na2O–B2O3–SiO2 RUPF Calculator</title>
+<title>Glass Structure Calculator</title>
 
 <style>
 body{
 font-family:Arial;
-background:#f4f6f8;
-padding:40px;
+margin:40px;
 }
 
-.container{
-background:white;
-padding:30px;
-max-width:800px;
-margin:auto;
-border-radius:10px;
-box-shadow:0 5px 15px rgba(0,0,0,0.15);
+table{
+border-collapse:collapse;
+margin-top:20px;
+}
+
+td,th{
+border:1px solid #999;
+padding:6px 10px;
+text-align:center;
 }
 
 input{
-padding:8px;
-margin:5px;
+width:70px;
 }
 
-button{
-padding:10px 20px;
-background:#2c7be5;
-color:white;
-border:none;
-border-radius:5px;
-cursor:pointer;
-}
-
-.result{
-margin-top:20px;
-font-size:16px;
-}
 </style>
-
 </head>
 
 <body>
 
-<div class="container">
+<h2>Na2O – B2O3 – SiO2 Glass Calculator</h2>
 
-<h2>Na₂O–B₂O₃–SiO₂ Glass Structure Calculator</h2>
+<p>Enter composition and density</p>
 
-<label>Na₂O fraction (y)</label> <input id="y" type="number" step="0.01">
+<table>
+<tr>
+<th>x (B2O3 fraction)</th>
+<th>y (Na2O fraction)</th>
+<th>Density (g/cm³)</th>
+</tr>
 
-<label>B₂O₃ fraction (x)</label> <input id="x" type="number" step="0.01">
+<tr>
+<td><input id="x" value="0.3"></td>
+<td><input id="y" value="0.33"></td>
+<td><input id="rho" value="2.4"></td>
+</tr>
 
-<label>Density (g/cm³)</label> <input id="rho" type="number" step="0.01">
+</table>
 
-<br><br>
+<button onclick="calculate()">Calculate</button>
 
-<button onclick="calc()">Calculate</button>
+<h3>Results</h3>
 
-<div class="result" id="result"></div>
+<table>
 
-</div>
+<tr>
+<th>Property</th>
+<th>Value</th>
+</tr>
+
+<tr>
+<td>Molar Mass</td>
+<td id="M"></td>
+</tr>
+
+<tr>
+<td>Molar Volume</td>
+<td id="Vm"></td>
+</tr>
+
+<tr>
+<td>Na atoms</td>
+<td id="Na"></td>
+</tr>
+
+<tr>
+<td>B atoms</td>
+<td id="B"></td>
+</tr>
+
+<tr>
+<td>Si atoms</td>
+<td id="Si"></td>
+</tr>
+
+<tr>
+<td>O atoms</td>
+<td id="O"></td>
+</tr>
+
+<tr>
+<td>Total atoms</td>
+<td id="Total"></td>
+</tr>
+
+<tr>
+<td>APF</td>
+<td id="APF"></td>
+</tr>
+
+<tr>
+<td>RUPF</td>
+<td id="RUPF"></td>
+</tr>
+
+</table>
+
 
 <script>
 
-function sphere(r){
-return (4/3)*Math.PI*Math.pow(r,3);
+function calculate(){
+
+let x=parseFloat(document.getElementById("x").value)
+let y=parseFloat(document.getElementById("y").value)
+let rho=parseFloat(document.getElementById("rho").value)
+
+
+// molar mass
+
+let M_Na2O=61.98
+let M_B2O3=69.62
+let M_SiO2=60.08
+
+let M =
+y*M_Na2O +
+(1-y)*( x*M_B2O3 + (1-x)*M_SiO2 )
+
+
+// molar volume
+
+let Vm = M/rho
+
+
+
+// atom numbers
+
+let Na = 2*y
+let B  = 2*(1-y)*x
+let Si = (1-y)*(1-x)
+let O  = y + 3*(1-y)*x + 2*(1-y)*(1-x)
+
+let total = Na+B+Si+O
+
+
+
+// Shannon radii (Å)
+
+let rNa=1.02
+let rB=0.11
+let rSi=0.26
+let rO=1.40
+
+
+// sphere volume
+
+function vol(r){
+
+return (4/3)*Math.PI*Math.pow(r,3)
+
 }
 
-function calc(){
 
-let x=parseFloat(document.getElementById("x").value);
-let y=parseFloat(document.getElementById("y").value);
-let rho=parseFloat(document.getElementById("rho").value);
+// packing
 
-let Na2O=y;
-let B2O3=(1-y)*x;
-let SiO2=(1-y)*(1-x);
+let Vatom =
+Na*vol(rNa)+
+B*vol(rB)+
+Si*vol(rSi)+
+O*vol(rO)
 
-/* Dell-Bray Boron model */
 
-let R=B2O3>0?Na2O/B2O3:0;
+// convert Å³ → cm³
 
-let N4;
+Vatom=Vatom*1e-24*6.022e23
 
-if(R<=0.5){N4=R;}
-else if(R<=1){N4=0.5;}
-else{N4=1/R;}
 
-let B3=1-N4;
+let APF = Vatom/Vm
 
-/* molar mass */
 
-let M = Na2O*61.98 + B2O3*69.62 + SiO2*60.09;
+// simplified RUPF
 
-let Vm=M/rho;
+let RUPF = APF/(1+APF)
 
-/* ionic radii (Å) */
 
-let rO=1.40;
-let rSi=0.26;
-let rB3=0.11;
-let rB4=0.25;
-let rNa=1.02;
+// output
 
-/* oxygen count */
+document.getElementById("M").innerText=M.toFixed(3)
+document.getElementById("Vm").innerText=Vm.toFixed(3)
 
-let O_total = Na2O + 3*B2O3 + 2*SiO2;
+document.getElementById("Na").innerText=Na.toFixed(3)
+document.getElementById("B").innerText=B.toFixed(3)
+document.getElementById("Si").innerText=Si.toFixed(3)
+document.getElementById("O").innerText=O.toFixed(3)
 
-/* oxygen packing */
+document.getElementById("Total").innerText=total.toFixed(3)
 
-let Ox_APF=(O_total*sphere(rO))/(Vm*1e24);
-
-/* RUPF */
-
-let B_total=2*B2O3;
-
-let atoms =
-SiO2*sphere(rSi)+
-(B_total*B3)*sphere(rB3)+
-(B_total*N4)*sphere(rB4)+
-(2*Na2O)*sphere(rNa)+
-O_total*sphere(rO);
-
-let RUPF=atoms/(Vm*1e24);
-
-document.getElementById("result").innerHTML=
-
-"Fraction of 3-coordinated B = "+B3.toFixed(4)+"<br>"+
-"ηM (Ox_APF) = "+Ox_APF.toFixed(4)+"<br>"+
-"ηRUPF = "+RUPF.toFixed(4);
+document.getElementById("APF").innerText=APF.toFixed(4)
+document.getElementById("RUPF").innerText=RUPF.toFixed(4)
 
 }
 

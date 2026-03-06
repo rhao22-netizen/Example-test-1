@@ -1,0 +1,91 @@
+import math
+
+# ---------- ionic radii (Å) ----------
+r_Si = 0.26
+r_B3 = 0.11
+r_B4 = 0.25
+r_O  = 1.40
+r_Na = 1.02
+
+NA = 6.022e23
+
+
+def sphere_volume(r):
+    return 4/3 * math.pi * (r**3)
+
+
+def calculate_glass(x, y, density):
+
+    # composition
+    Na2O = y
+    B2O3 = (1-y)*x
+    SiO2 = (1-y)*(1-x)
+
+    # Dell-Bray model
+    R = Na2O / B2O3
+
+    if R <= 0.5:
+        N4 = R
+    elif R <= 1:
+        N4 = 0.5
+    else:
+        N4 = 1/R
+
+    N3 = 1 - N4
+
+    # number of atoms
+    B_total = 2 * B2O3
+    B4 = B_total * N4
+    B3 = B_total * N3
+
+    Si = SiO2
+    Na = 2 * Na2O
+
+    O_total = Na2O*1 + B2O3*3 + SiO2*2
+
+    # NBO model
+    NBO = max(0, 2*Na2O - B4)
+    BO = O_total - NBO
+
+    # molar mass
+    M = (
+        Na2O*61.98 +
+        B2O3*69.62 +
+        SiO2*60.09
+    )
+
+    Vm = M / density
+
+    # atomic volume
+    V_atoms = (
+        Si * sphere_volume(r_Si) +
+        B3 * sphere_volume(r_B3) +
+        B4 * sphere_volume(r_B4) +
+        Na * sphere_volume(r_Na) +
+        O_total * sphere_volume(r_O)
+    )
+
+    # unit conversion
+    V_atoms_cm = V_atoms * 1e-24 * NA
+
+    APF = V_atoms_cm / Vm
+
+    return {
+        "Na2O":Na2O,
+        "B2O3":B2O3,
+        "SiO2":SiO2,
+        "B3_fraction":N3,
+        "B4_fraction":N4,
+        "O_total":O_total,
+        "NBO":NBO,
+        "BO":BO,
+        "Molar_volume":Vm,
+        "APF":APF
+    }
+
+
+# example
+result = calculate_glass(x=0.4, y=0.3, density=2.45)
+
+for k,v in result.items():
+    print(k,":",v)

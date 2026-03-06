@@ -1,156 +1,276 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-<meta charset="UTF-8">
-<title>Na2O-B2O3-SiO2 Glass Calculator</title>
-<style>
-body{
-  font-family:Arial;
-  margin:40px;
-  background:#f4f6f8;
-}
-.container{
-  background:white;
-  padding:30px;
-  border-radius:10px;
-  max-width:700px;
-  box-shadow:0 4px 20px rgba(0,0,0,0.1);
-}
-table{
-  border-collapse:collapse;
-  margin-top:20px;
-}
-td,th{
-  border:1px solid #aaa;
-  padding:8px 12px;
-  text-align:center;
-}
-input{
-  width:90px;
-  padding:4px;
-}
-button{
-  margin-top:10px;
-  padding:10px 20px;
-  background:#2f6ed6;
-  color:white;
-  border:none;
-  border-radius:6px;
-  cursor:pointer;
-}
-</style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Na2O-B2O3-SiO2 Glass Calculator</title>
+  <style>
+    body{
+      font-family: Arial, sans-serif;
+      margin: 40px;
+      background:#f4f6f8;
+      color:#111;
+    }
+
+    .container{
+      background:white;
+      padding:30px;
+      border-radius:12px;
+      max-width:900px;
+      box-shadow:0 4px 20px rgba(0,0,0,0.10);
+    }
+
+    h1{
+      margin-top:0;
+      margin-bottom:20px;
+      font-size:2.2rem;
+    }
+
+    p{
+      font-size:1.1rem;
+      margin-bottom:20px;
+    }
+
+    table{
+      border-collapse:collapse;
+      margin-top:20px;
+      width:100%;
+      max-width:760px;
+    }
+
+    td, th{
+      border:1px solid #aaa;
+      padding:10px 14px;
+      text-align:center;
+      font-size:1rem;
+    }
+
+    input{
+      width:110px;
+      padding:8px;
+      font-size:1rem;
+      box-sizing:border-box;
+    }
+
+    button{
+      margin-top:16px;
+      padding:12px 24px;
+      background:#2f6ed6;
+      color:white;
+      border:none;
+      border-radius:8px;
+      cursor:pointer;
+      font-size:1rem;
+    }
+
+    button:hover{
+      background:#2459ae;
+    }
+
+    .note{
+      margin-top:18px;
+      font-size:0.95rem;
+      color:#444;
+      max-width:760px;
+      line-height:1.5;
+    }
+
+    .error{
+      color:#b00020;
+      font-weight:bold;
+      margin-top:14px;
+    }
+  </style>
 </head>
 <body>
+  <div class="container">
+    <h1>Na₂O – B₂O₃ – SiO₂ Glass Calculator</h1>
+    <p>True calculation version (not lookup-table version)</p>
 
-<div class="container">
-  <h2>Na2O – B2O3 – SiO2 Glass Calculator</h2>
-  <p>Enter composition and density</p>
+    <table>
+      <tr>
+        <th>x (B₂O₃ fraction)</th>
+        <th>y (Na₂O fraction)</th>
+        <th>Density (g/cm³)</th>
+      </tr>
+      <tr>
+        <td><input id="x" type="number" step="any" value="0.3"></td>
+        <td><input id="y" type="number" step="any" value="0.33"></td>
+        <td><input id="rho" type="number" step="any" value="2.52"></td>
+      </tr>
+    </table>
 
-  <table>
-    <tr>
-      <th>x (B2O3 fraction)</th>
-      <th>y (Na2O fraction)</th>
-      <th>Density (g/cm³)</th>
-    </tr>
-    <tr>
-      <td><input id="x" value="0.3"></td>
-      <td><input id="y" value="0.33"></td>
-      <td><input id="rho" value="2.52"></td>
-    </tr>
-  </table>
+    <button onclick="calculate()">Calculate</button>
 
-  <button onclick="calculate()">Calculate</button>
+    <div id="error" class="error"></div>
 
-  <h3>Results</h3>
+    <h2>Results</h2>
 
-  <table>
-    <tr>
-      <th>Property</th>
-      <th>Value</th>
-    </tr>
-    <tr>
-      <td>Molar Mass</td>
-      <td id="M"></td>
-    </tr>
-    <tr>
-      <td>Molar Volume</td>
-      <td id="Vm"></td>
-    </tr>
-    <tr>
-      <td>APF</td>
-      <td id="APF"></td>
-    </tr>
-    <tr>
-      <td>RUPF</td>
-      <td id="RUPF"></td>
-    </tr>
-  </table>
-</div>
+    <table>
+      <tr>
+        <th>Property</th>
+        <th>Value</th>
+      </tr>
+      <tr>
+        <td>Molar Mass (g/mol)</td>
+        <td id="M"></td>
+      </tr>
+      <tr>
+        <td>Molar Volume (cm³/mol)</td>
+        <td id="Vm"></td>
+      </tr>
+      <tr>
+        <td>Na atoms</td>
+        <td id="nNa"></td>
+      </tr>
+      <tr>
+        <td>B atoms</td>
+        <td id="nB"></td>
+      </tr>
+      <tr>
+        <td>Si atoms</td>
+        <td id="nSi"></td>
+      </tr>
+      <tr>
+        <td>O atoms</td>
+        <td id="nO"></td>
+      </tr>
+      <tr>
+        <td>Total ionic volume (cm³/mol)</td>
+        <td id="Vion"></td>
+      </tr>
+      <tr>
+        <td>APF</td>
+        <td id="APF"></td>
+      </tr>
+      <tr>
+        <td>RUPF</td>
+        <td id="RUPF"></td>
+      </tr>
+    </table>
 
-<script>
-function calculate(){
+    <div class="note">
+      Current radii used in this version:<br>
+      Na⁺ = 1.02 Å, B³⁺ = 0.11 Å, Si⁴⁺ = 0.26 Å, O²⁻ = 1.40 Å.<br>
+      If your Excel uses different radii, B coordination fractions, or a different RUPF relation,
+      the numbers will differ slightly. This page is a real formula-based calculator, not a table lookup.
+    </div>
+  </div>
 
-let x=parseFloat(document.getElementById("x").value)
-let y=parseFloat(document.getElementById("y").value)
-let rho=parseFloat(document.getElementById("rho").value)
+  <script>
+    function sphereVolumeA3(r){
+      return (4 / 3) * Math.PI * Math.pow(r, 3);
+    }
 
-const NA = 6.022e23
+    function setText(id, value){
+      document.getElementById(id).textContent = value;
+    }
 
-// molar masses
-const M_Na2O = 61.98
-const M_B2O3 = 69.62
-const M_SiO2 = 60.08
+    function clearResults(){
+      const ids = ["M", "Vm", "nNa", "nB", "nSi", "nO", "Vion", "APF", "RUPF"];
+      for (const id of ids){
+        setText(id, "");
+      }
+    }
 
-// molar mass
-let M =
-y*M_Na2O +
-(1-y)*(x*M_B2O3 + (1-x)*M_SiO2)
+    function calculate(){
+      const errorBox = document.getElementById("error");
+      errorBox.textContent = "";
+      clearResults();
 
-// molar volume
-let Vm = M/rho
+      const x = parseFloat(document.getElementById("x").value);
+      const y = parseFloat(document.getElementById("y").value);
+      const rho = parseFloat(document.getElementById("rho").value);
 
-// number of atoms
-let nNa = 2*y
-let nB  = 2*x*(1-y)
-let nSi = (1-x)*(1-y)
-let nO  = y + 3*x*(1-y) + 2*(1-x)*(1-y)
+      if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(rho)){
+        errorBox.textContent = "Please enter valid numbers for x, y, and density.";
+        return;
+      }
 
-// ionic radii (Å)
-let rNa = 1.02
-let rB  = 0.11
-let rSi = 0.26
-let rO  = 1.40
+      if (x < 0 || x > 1){
+        errorBox.textContent = "x must be between 0 and 1.";
+        return;
+      }
 
-// sphere volume Å³
-function vol(r){
-return (4/3)*Math.PI*Math.pow(r,3)
-}
+      if (y < 0 || y > 1){
+        errorBox.textContent = "y must be between 0 and 1.";
+        return;
+      }
 
-// atomic volume
-let Vatoms =
-nNa*vol(rNa) +
-nB*vol(rB) +
-nSi*vol(rSi) +
-nO*vol(rO)
+      if (rho <= 0){
+        errorBox.textContent = "Density must be greater than 0.";
+        return;
+      }
 
-// convert Å³ → cm³
-Vatoms = Vatoms*1e-24*NA
+      // Molar masses (g/mol)
+      const M_Na2O = 61.98;
+      const M_B2O3 = 69.62;
+      const M_SiO2 = 60.08;
 
-// APF
-let APF = Vatoms / Vm
+      // Avogadro number
+      const NA = 6.02214076e23;
 
-// RUPF
-let RUPF = APF + 0.0032
+      // Ionic radii (Å)
+      const rNa = 1.02;
+      const rB  = 0.11;
+      const rSi = 0.26;
+      const rO  = 1.40;
 
-// output
-document.getElementById("M").innerHTML=M.toFixed(3)
-document.getElementById("Vm").innerHTML=Vm.toFixed(3)
-document.getElementById("Vt").innerHTML=Vatoms.toFixed(3)
-document.getElementById("APF").innerHTML=APF.toFixed(4)
-document.getElementById("RUPF").innerHTML=RUPF.toFixed(4)
+      // Composition:
+      // y Na2O + (1-y)[x B2O3 + (1-x) SiO2]
 
-}
-</script>
+      // Molar mass
+      const M =
+        y * M_Na2O +
+        (1 - y) * (x * M_B2O3 + (1 - x) * M_SiO2);
 
+      // Molar volume
+      const Vm = M / rho;
+
+      // Number of atoms per mole of glass batch expression
+      const nNa = 2 * y;
+      const nB  = 2 * x * (1 - y);
+      const nSi = (1 - x) * (1 - y);
+      const nO  = y + 3 * x * (1 - y) + 2 * (1 - x) * (1 - y);
+
+      // Ionic volumes in Å^3
+      const vNa = sphereVolumeA3(rNa);
+      const vB  = sphereVolumeA3(rB);
+      const vSi = sphereVolumeA3(rSi);
+      const vO  = sphereVolumeA3(rO);
+
+      // Total ionic volume in Å^3 per formula expression
+      let VionA3 =
+        nNa * vNa +
+        nB  * vB  +
+        nSi * vSi +
+        nO  * vO;
+
+      // Convert Å^3 * mol^-1 to cm^3/mol
+      // 1 Å^3 = 1e-24 cm^3
+      const Vion = VionA3 * 1e-24 * NA;
+
+      // APF
+      const APF = Vion / Vm;
+
+      // RUPF
+      // Current simple correction form
+      const RUPF = APF + 0.0032;
+
+      // Output
+      setText("M", M.toFixed(3));
+      setText("Vm", Vm.toFixed(3));
+      setText("nNa", nNa.toFixed(3));
+      setText("nB", nB.toFixed(3));
+      setText("nSi", nSi.toFixed(3));
+      setText("nO", nO.toFixed(3));
+      setText("Vion", Vion.toFixed(3));
+      setText("APF", APF.toFixed(4));
+      setText("RUPF", RUPF.toFixed(4));
+    }
+
+    // Auto-run once on load
+    calculate();
+  </script>
 </body>
 </html>

@@ -3,7 +3,7 @@
 <head>
 
 <meta charset="UTF-8">
-<title>Glass Packing Calculator</title>
+<title>Na2O-B2O3-SiO2 Glass Calculator</title>
 
 <style>
 
@@ -57,7 +57,7 @@ cursor:pointer;
 
 <h2>Na₂O – B₂O₃ – SiO₂ Glass Calculator</h2>
 
-<p>Makishima–Mackenzie Model</p>
+<p>Enter composition and density</p>
 
 <table>
 
@@ -87,12 +87,12 @@ cursor:pointer;
 </tr>
 
 <tr>
-<td>Molar Mass (g/mol)</td>
+<td>Molar Mass</td>
 <td id="M"></td>
 </tr>
 
 <tr>
-<td>Molar Volume (cm³/mol)</td>
+<td>Molar Volume</td>
 <td id="Vm"></td>
 </tr>
 
@@ -115,6 +115,7 @@ cursor:pointer;
 
 </div>
 
+
 <script>
 
 function calculate(){
@@ -126,12 +127,12 @@ let rho=parseFloat(document.getElementById("rho").value)
 
 // molar masses
 
-const M_Na2O=61.98
-const M_B2O3=69.62
-const M_SiO2=60.08
+const M_Na2O = 61.98
+const M_B2O3 = 69.62
+const M_SiO2 = 60.08
 
 
-// molar mass
+// molar mass calculation
 
 let M =
 y*M_Na2O +
@@ -143,26 +144,26 @@ y*M_Na2O +
 let Vm = M/rho
 
 
-// packing volumes (Makishima–Mackenzie corrected)
+// Makishima–Mackenzie packing volumes
 
 const V_Na2O = 11.2
 const V_B2O3 = 12.2
 const V_SiO2 = 14.6
 
 
-// total packing volume
+// packing volume calculation (正确公式)
 
 let Vt =
 y*V_Na2O +
 (1-y)*(x*V_B2O3 + (1-x)*V_SiO2)
 
 
-// APF
+// atomic packing fraction
 
 let APF = Vt / Vm
 
 
-// RUPF correction
+// random packing correction
 
 let RUPF = APF + 0.0032
 

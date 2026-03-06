@@ -4,15 +4,14 @@
 <head>
 
 <meta charset="UTF-8">
-
-<title>Glass Structure Calculator</title>
+<title>Glass Structure Calculator (MM Model)</title>
 
 <style>
 
 body{
 font-family:Arial;
 margin:40px;
-background:#f4f6f8;
+background:#f5f6fa;
 }
 
 .container{
@@ -36,7 +35,7 @@ text-align:center;
 }
 
 input{
-width:90px;
+width:80px;
 padding:4px;
 }
 
@@ -54,50 +53,40 @@ cursor:pointer;
 
 </head>
 
-
 <body>
 
 <div class="container">
 
-<h1>Na₂O – B₂O₃ – SiO₂ Glass Structure Calculator</h1>
+<h1>Na₂O–B₂O₃–SiO₂ Glass Calculator</h1>
 
-<p>Input Na₂O fraction and density</p>
+<p>Makishima–Mackenzie Model</p>
 
-<label>y (Na₂O fraction)</label>
+<label>Na₂O fraction (y)</label>
 <input id="y" value="0.33">
-
-<label>Density (g/cm³)</label>
-<input id="rho" value="2.52">
-
-<br><br>
 
 <button onclick="generate()">Generate Table</button>
 
 <table id="table">
 
 <tr>
-
 <th>x</th>
+<th>Density</th>
 <th>Molar Mass</th>
 <th>Molar Volume</th>
 <th>Packing Volume</th>
 <th>APF</th>
 <th>RUPF</th>
-
 </tr>
 
 </table>
 
 </div>
 
-
 <script>
 
 function generate(){
 
 let y=parseFloat(document.getElementById("y").value)
-
-let rho=parseFloat(document.getElementById("rho").value)
 
 const M_Na2O=61.98
 const M_B2O3=69.62
@@ -107,12 +96,60 @@ const V_Na2O=11.2
 const V_B2O3=13.3
 const V_SiO2=26.9
 
+
+// density table (replace with your real data)
+
+const densityTable={
+
+0.0:2.20,
+0.1:2.30,
+0.2:2.40,
+0.3:2.52,
+0.4:2.60,
+0.5:2.66,
+0.6:2.70,
+0.7:2.73,
+0.8:2.75,
+0.9:2.77,
+1.0:2.78
+
+}
+
+
+// interpolation
+
+function density(x){
+
+let keys=Object.keys(densityTable).map(Number)
+
+for(let i=0;i<keys.length-1;i++){
+
+let x1=keys[i]
+let x2=keys[i+1]
+
+if(x>=x1 && x<=x2){
+
+let y1=densityTable[x1]
+let y2=densityTable[x2]
+
+return y1+(y2-y1)*(x-x1)/(x2-x1)
+
+}
+
+}
+
+return densityTable[keys[keys.length-1]]
+
+}
+
+
 let table=document.getElementById("table")
 
 table.innerHTML=
 
 `<tr>
 <th>x</th>
+<th>Density</th>
 <th>Molar Mass</th>
 <th>Molar Volume</th>
 <th>Packing Volume</th>
@@ -120,7 +157,10 @@ table.innerHTML=
 <th>RUPF</th>
 </tr>`
 
+
 for(let x=0;x<=1.0001;x+=0.05){
+
+let rho=density(x)
 
 let M=
 
@@ -138,20 +178,22 @@ let APF=Vt/Vm
 
 let RUPF=APF+0.0032
 
-let row=
 
-`<tr>
+table.innerHTML+=`
+
+<tr>
 
 <td>${x.toFixed(2)}</td>
+<td>${rho.toFixed(3)}</td>
 <td>${M.toFixed(3)}</td>
 <td>${Vm.toFixed(3)}</td>
 <td>${Vt.toFixed(3)}</td>
 <td>${APF.toFixed(4)}</td>
 <td>${RUPF.toFixed(4)}</td>
 
-</tr>`
+</tr>
 
-table.innerHTML+=row
+`
 
 }
 
@@ -160,5 +202,4 @@ table.innerHTML+=row
 </script>
 
 </body>
-
 </html>
